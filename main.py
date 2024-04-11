@@ -17,7 +17,7 @@ def main():
 
     print(opcao)
     if opcao == 1:
-        login()
+        login(connection)
     elif opcao == 2:
         register(connection)
     else:
@@ -55,9 +55,54 @@ def tipo_utilizador(connection):
     rows = cursor.fetchall()
     return rows
 
-def login():
+def login(connection):
 
-    return None
+    os.system('cls')
+
+    print(" ***** Login *****")
+    print(" * \n * Login com os seus dados\n *")
+
+    email_invalido = True
+    passe_invalida = True
+
+    while email_invalido or passe_invalida:
+
+        email = str(123)
+        while email.isdigit():
+            email = input(" * Email: ")
+            if email.isdigit():
+                print("\n *** ATENÇÃO -> Input inválido ***")
+
+        passe = str(123)
+        while passe.isdigit():
+            passe = input(" * Password: ")
+            if passe.isdigit():
+                print("\n *** ATENÇÃO -> Input inválido! ***")
+
+        # fetch de utilizadores
+        cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+        fetch_utilizadores = " SELECT email, passe, nome FROM utilizador WHERE email = %s"
+        cursor.execute(fetch_utilizadores, (email,))
+        linha = cursor.fetchone()
+
+        # verificar se o utilizador existe
+        utilizador = []
+        if email == linha['email']:
+            email_invalido = False
+
+            if passe == linha['passe']:
+                passe_invalida = False
+                nome = linha['nome']
+                utilizador = [email, passe, nome]
+            else:
+                passe_invalida = True
+
+        if email_invalido or passe_invalida:
+            print(" * \n *** ATENÇÃO -> Um dos campos está inválido! ***")
+    
+    print(" * \n * \n * Login efetuado com sucesso! * ")
+    print(" * \n * Bem vindo, ", nome)
+    return utilizador
 
 def register(connection):
     os.system('cls')
