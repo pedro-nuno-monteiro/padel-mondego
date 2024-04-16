@@ -13,47 +13,99 @@ def main():
         print("Erro na conexão - a sair do programa")
         return
 
-    opcao = menu()
+    tipo_user = None
+    opcao = 1
+    while opcao > 0 or opcao < 3:
+        opcao = menu()
+        if opcao == 1:
+            utilizador = login(connection)
+            
+            # definir o tipo de utilizador
+            tipo_user = tipo_utilizador(connection, utilizador)
+            break
 
-    print(opcao)
-    if opcao == 1:
-        login(connection)
-    elif opcao == 2:
-        register(connection)
+        elif opcao == 2:
+            register(connection)
+        
+        elif opcao == 3:
+            sair()
+            break
+
+    if tipo_user == 'admin':
+        menu_admin(connection)
+    elif tipo_user == 'super_admin':
+        menu_super_admin(connection)
     else:
-        sair()
+        menu_cliente(connection, utilizador)
 
-    time.sleep(5)
+    print("adeus")
+
+def menu_cliente(connection, utilizador):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    os.system('cls')
+    print(" ***** Menu Cliente *****\n *")
+    print(" * 1 - Informações e Perfil")
+    print(" * 2 - Reservar Campo")
+    print(" * 3 - Reservas atuais")
+    print(" * 4 - Histórico de Reservas")
+    print(" * 5 - Logout\n *")
     
-    # definir o tipo de utilizador
-    utilizadores_admin = tipo_utilizador(connection)
+    opcao = 0
+    while opcao < 1 or opcao > 5:
+        opcao = int(input(" * Escolha uma opção -> "))
 
-    admins = []
-    s_admin = []
-    for user in utilizadores_admin:
-        if user['super_admin']:
-            s_admin.append(user)
-        else:
-            admins.append(user)
+    if opcao == 1:
 
-    print("Admins: ", admins)
-    print("Super Admins: ", s_admin)
+        # definir linhas de sql querys
+        fetch_utilizadores = """
+            SELECT *
+            FROM utilizador as u, administrador as a
+            WHERE u.email = a.utilizador_email AND u.email = %s
+        """
 
+        # executar querys
+        cursor.execute(fetch_utilizadores, (utilizador['email'],))
+        linha = cursor.fetchone()
 
-def tipo_utilizador(connection):
+        os.system('cls')
+        print(" ***** Informações do clube Padel Mondego *****\n *")
+        print("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc cursus porttitor nisi a venenatis. Mauris elementum tincidunt nisi eu consequat. Cras tristique libero cursus sem eleifend facilisis. In hac habitasse platea dictumst. Mauris fringilla viverra elit, sit amet viverra ligula ultricies ut. Mauris sagittis dictum vestibulum.")
+        print(" \n\n\n ")
+        print(" ***** Perfil do Cliente *****\n *")
+        print(" * Nome: ", utilizador['nome'])
+        print(" * Email: ", utilizador['email'])
+        print(" * NIF: ", utilizador['nif'])
+        print(" * Telemóvel: ", utilizador['numero_telefone'])
+        
+
+def tipo_utilizador(connection, utilizador):
+
+    tipo_user = None
+
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
     # definir linhas de sql querys
     fetch_admins = """
-        SELECT u.email, u.nome, u.passe, a.admin_id, a.super_admin
+        SELECT *
         FROM utilizador as u, administrador as a
-        WHERE u.email = a.utilizador_email
+        WHERE u.email = a.utilizador_email AND u.email = %s
     """
 
     # executar querys
-    cursor.execute(fetch_admins)
-    rows = cursor.fetchall()
-    return rows
+    cursor.execute(fetch_admins, (utilizador['email'],))
+    linha = cursor.fetchone()
+
+    if linha is not None:
+        if linha['super_admin']:
+            tipo_user = 'super_admin'
+        else:
+            tipo_user = 'admin'
+    else:
+        tipo_user = 'cliente'
+
+    return tipo_user
 
 def login(connection):
 
@@ -87,13 +139,17 @@ def login(connection):
 
         # verificar se o utilizador existe
         utilizador = []
-        if email == linha['email']:
+        if linha is None:
+            email_invalido = True
+            passe_invalida = True
+        
+        elif email == linha['email']:
             email_invalido = False
 
             if passe == linha['passe']:
                 passe_invalida = False
                 nome = linha['nome']
-                utilizador = [email, passe, nome]
+                utilizador = {'email': email, 'passe': passe, 'nome': nome}
             else:
                 passe_invalida = True
 
@@ -101,7 +157,26 @@ def login(connection):
             print(" * \n *** ATENÇÃO -> Um dos campos está inválido! ***")
     
     print(" * \n * \n * Login efetuado com sucesso! * ")
-    print(" * \n * Bem vindo, ", nome)
+
+    # verifica se é admin ou cliente
+    tipo_user = tipo_utilizador(connection, utilizador)
+
+    if tipo_user == 'admin':
+        fetch_utilizadores = " SELECT super_admin FROM administrador WHERE utilizador_email = %s"
+        cursor.execute(fetch_utilizadores, (email,))
+        linha = cursor.fetchone()
+        if linha['super_admin']:
+            utilizador['super_admin'] = True
+        else:
+            utilizador['super_admin'] = False
+    else:
+        fetch_utilizadores = " SELECT nif, numero_telefone FROM cliente WHERE utilizador_email = %s"
+        cursor.execute(fetch_utilizadores, (email,))
+        nif, numero_telefone = cursor.fetchone()
+        utilizador.update({'nif': nif, 'numero_telefone': numero_telefone})
+    
+    print(" * \n * Bem vindo,", tipo_user, nome)
+    time.sleep(2)
     return utilizador
 
 def register(connection):
@@ -114,7 +189,6 @@ def register(connection):
     
     # adicionar whiles de segurança
     nome = input(" * Nome: ")
-
 
     email_existe = True
     while email_existe:
@@ -234,6 +308,8 @@ def register(connection):
 
         user.append(user_cliente)
 
+    time.sleep(2)
+    os.system('cls')
     return user
 
 def sair():
@@ -248,8 +324,10 @@ def menu():
     print(" * 1 - Login")
     print(" * 2 - Registar")
     print(" * 3 - Sair\n * ")
-
-    opcao = int(input(" * Escolha uma opção -> "))
+    
+    opcao = 0
+    while opcao < 1 or opcao > 3:
+        opcao = int(input(" * Escolha uma opção -> "))
 
     return opcao
 
