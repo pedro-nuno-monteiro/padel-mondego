@@ -22,6 +22,12 @@ INSERT INTO campo (id_campo, descricao) VALUES
 (3, 'Campo 3');
 
 -- tabela price
+
+-- semana: 
+-- -- 15h - 18h: 24€
+-- -- 18h - 24h: 30€ 
+
+-- fds: 20€
 INSERT INTO price (id_custo, tipo_dia, horario, data_alteracao, ativo, valor_antigo, preco_atual) VALUES
 (1, 'Dia de semana', 'Normal', '2024-04-08', TRUE, 30, 24),
 (2, 'Dia de semana', 'Nobre', '2024-04-08', TRUE, 35, 30),
@@ -29,11 +35,17 @@ INSERT INTO price (id_custo, tipo_dia, horario, data_alteracao, ativo, valor_ant
 (4, 'Dia de semana', 'Normal', '2024-04-08', FALSE, 35, 30);
 
 -- tabela reserva
+
+-- semana: 15h - 24h: 
+-- -- 15h/16h30, 16h30/18h, 18h/19h30, 19h30/21h, 21h/22h30, 22h30/24h
+
+-- fds: 10h - 22h: 
+-- -- 10h/11h30, 11h30/13h, 13h/14h30, 14h30/16h, 16h/17h30, 17h30/19h, 19h/20h30, 20h30/22h
 INSERT INTO reserva (id_reserva, horario, estado, price_id_custo, campo_id_campo, cliente_utilizador_email) VALUES
-(1, '2024-04-08 10:00:00', 'Reservado', 1, 1, 'afonso@gmail.com'),
-(2, '2024-04-09 15:00:00', 'Finalizado', 2, 2, 'afonso@gmail.com'),
-(3, '2024-04-01 10:00:00', 'Cancelado', 3, 3, 'afonso@gmail.com'),
-(4, '2024-04-02 10:00:00', 'Finalizado', 4, 3, 'luis@gmail.com'),
+(1, '2024-04-16 15:00:00', 'Reservado', 1, 1, 'afonso@gmail.com'),
+(2, '2024-04-16 16:30:00', 'Reservado', 1, 1, 'afonso@gmail.com'),
+(3, '2024-04-16 19:30:00', 'Reservado', 2, 3, 'afonso@gmail.com'),
+(4, '2024-04-16 22:30:00', 'Reservado', 2, 3, 'luis@gmail.com'),
 (5, '2024-04-03 10:00:00', 'Em Espera', 1, 3, 'luis@gmail.com'),
 (6, '2024-04-04 10:00:00', 'Em Espera Cancelado', 2, 1, 'luis@gmail.com'),
 (7, '2024-04-04 10:00:00', 'Alterado Reservado', 3, 2, 'luis@gmail.com'),

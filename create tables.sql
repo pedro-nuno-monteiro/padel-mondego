@@ -9,8 +9,8 @@ CREATE TABLE reserva (
 	id_reserva		 NUMERIC(8,2),
 	horario			 TIMESTAMP,
 	estado			 TEXT,
-	price_id_custo		 BIGINT NOT NULL,
-	campo_id_campo		 BIGINT NOT NULL,
+	price_id_custo		 INTEGER NOT NULL,
+	campo_id_campo		 INTEGER NOT NULL,
 	cliente_utilizador_email VARCHAR(512) NOT NULL,
 	PRIMARY KEY(id_reserva)
 );
@@ -47,13 +47,13 @@ CREATE TABLE permissoes (
 );
 
 CREATE TABLE campo (
-	id_campo	 BIGINT,
+	id_campo	 INTEGER,
 	descricao VARCHAR(512),
 	PRIMARY KEY(id_campo)
 );
 
 CREATE TABLE price (
-	id_custo	 BIGINT,
+	id_custo	 INTEGER,
 	tipo_dia	 VARCHAR(512),
 	horario	 VARCHAR(512),
 	data_alteracao DATE,
