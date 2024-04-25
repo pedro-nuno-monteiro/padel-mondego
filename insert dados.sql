@@ -7,8 +7,8 @@ INSERT INTO utilizador (email, passe, nome) VALUES
 
 -- tabela cliente
 INSERT INTO cliente (nif, numero_telefone, utilizador_email) VALUES
-(123456, 123456, 'afonso@gmail.com'),
-(876543, 876543, 'luis@gmail.com');
+(123456789, 123456789, 'afonso@gmail.com'),
+(987654321, 987654321, 'luis@gmail.com');
 
 -- tabela admin
 INSERT INTO administrador (admin_id, super_admin, utilizador_email) VALUES

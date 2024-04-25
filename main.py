@@ -2,7 +2,7 @@ import psycopg2
 import psycopg2.extras
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def main():
     os.system('cls')
@@ -12,6 +12,8 @@ def main():
     if not connection:
         print("Erro na conexão - a sair do programa")
         return
+
+    atualiza_campos(connection)
 
     tipo_user = None
     opcao = 1
@@ -46,16 +48,8 @@ def menu_cliente(connection, utilizador):
 
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
-    os.system('cls')
-    print(" ***** Menu Cliente *****\n *")
-    print(" * 1 - Informações e Perfil")
-    print(" * 2 - Reservar Campo")
-    print(" * 3 - Reservas atuais")
-    print(" * 4 - Histórico de Reservas")
-    print(" * 5 - Logout\n *")
-
     opcao = 1
-    while opcao > 0 or opcao < 6:
+    while opcao > 0 or opcao < 5:
         opcao = apresentar_menu_cliente()
 
         if opcao == 1:
@@ -72,217 +66,352 @@ def menu_cliente(connection, utilizador):
             input(" * \n * Regressar - Enter")
 
         elif opcao == 2:
-
-            # update das datas das reservas para teste!
-            #custom_date = datetime(year = 2024, month = 4, day = 16)
-            #update_query = f"UPDATE reserva SET horario = '{custom_date.strftime('%Y-%m-%d')}'"
-            #cursor.execute(update_query)
-            #connection.commit()
-
-            fetch_reservas = """
-                SELECT *
-                FROM reserva as r
-            """
-
-            # executar querys
-            cursor.execute(fetch_reservas)
-            linhas = cursor.fetchall()
-
-            # colocar as reservas do dia atual (teste = 16/04)
-            reservas_hoje = []
-            ultimo_id = 0
-            date = datetime(year = 2024, month = 4, day = 16)
-            for linha in linhas:
-                ultimo_id += 1
-                if linha['horario'].date() == date.date():
-                    reservas_hoje.append(linha)
-
-                # funcional
-                #if linha['horario'].strftime("%Y-%m-%d") == datetime.now().strftime("%Y-%m-%d"):
-                #    reservas_hoje.append(linha)
-
-            os.system('cls')
-            print(" ***** Reserva de campo no Padel Mondego *****\n *")
-            #print(" * Campos Disponíveis para hoje,", datetime.now().strftime("%d/%m"))
-            print(" * Campos para hoje, 16/04, HORAS (SÓ MOSTRAR A PARTIR DA HORA ATUAL)") # teste
-
-            # listar todos os campos e todos os horários
-            # estados: reservado; cancelado; finalizado; em espera; em espera cancelado; alterado reservado; alterado finalizado
-            horarios_semana = ["15h00", "16h30", "18h00", "19h30", "21h00", "22h30"]
-            horarios_fds = ["10h", "11h30", "13h", "14h30", "16h", "17h30", "19h", "20h30"]
-
-            print(" * \n * Campo - 1 * \n * ")
-            i = 1
-            for horario_semana in horarios_semana:
-                reservado = False
-                for reserva_hoje in reservas_hoje:
-                    if reserva_hoje['campo_id_campo'] == 1 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
-                        if reserva_hoje['estado'] == 'Reservado':
-                            print(" * ", i, " - ", horario_semana, " | Reservado", " | ", reserva_hoje['cliente_utilizador_email'])
-                            reservado = True
-                            break
-                if not reservado:
-                    print(" * ", i, " - ", horario_semana, " | Livre")
-                i += 1
-
-            print(" * \n * Campo - 2 * \n * ")
-            for horario_semana in horarios_semana:
-                reservado = False
-                for reserva_hoje in reservas_hoje:
-                    if reserva_hoje['campo_id_campo'] == 2 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
-                        if reserva_hoje['estado'] == 'Reservado':
-                            print(" * ", i, " - ", horario_semana, " | Reservado", " | ", reserva_hoje['cliente_utilizador_email'])
-                            reservado = True
-                            break
-                if not reservado:
-                    print(" * ", i, " - ", horario_semana, " | Livre")
-                i += 1
-
-            print(" * \n * Campo - 3 * \n * ")
-            for horario_semana in horarios_semana:
-                reservado = False
-                for reserva_hoje in reservas_hoje:
-                    if reserva_hoje['campo_id_campo'] == 3 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
-                        if reserva_hoje['estado'] == 'Reservado':
-                            print(" * ", i, " - ", horario_semana, " | Reservado", " | ", reserva_hoje['cliente_utilizador_email'])
-                            reservado = True
-                            break
-                if not reservado:
-                    print(" * ", i, " - ", horario_semana, " | Livre")
-                i += 1
-
-            print(" *\n * Outras opções *\n * ")
-            print(" * ", i, " - Selecionar outro dia")
-            print(" * ", i + 1, " - Regressar")
-
-            # garantir que opção é válida + não reservar um campo que o user tem reservado
-            # claro que pode é reservar outros campos que estejam já reservados (ficam Em Espera)
-            opcao = 0
-            nao_pode_fazer_reserva = False
-            regressar = False
-            while opcao < 1 or opcao > i + 1 or nao_pode_fazer_reserva:
-                opcao = int(input(" *\n * Escolha uma opção -> "))
-
-                if opcao <= 6:
-                    hora_escolhida = horarios_semana[opcao - 1]
-                elif opcao > 6 and opcao <= 12:
-                    hora_escolhida = horarios_semana[opcao - 7]
-                elif opcao > 12 and opcao <= 18:
-                    hora_escolhida = horarios_semana[opcao - 13]
-
-                elif opcao == i:
-                    # vai para menu que pergunta que dia
-                    print("oh diabooooo")
-                    regressar = True # para enquanto não estiver implementado
-                    break
-                elif opcao == i + 1:
-                    print("regressar")
-                    regressar = True
-                    break
-
-                for reserva_hoje in reservas_hoje:
-                    if reserva_hoje['estado'] == 'Reservado' and reserva_hoje['horario'].strftime("%Hh%M") == hora_escolhida and reserva_hoje['cliente_utilizador_email'] == utilizador['email']:
-                        nao_pode_fazer_reserva = True
-                        print(" * \n * ATENÇÃO -> Não pode reservar um campo que já reservou! * ")
-                        break
-
-                # USER SÓ PODE FICAR EM ESPERA 1 VEZ
-
-            if not regressar:
-                # efetuar reserva
-                reserva_a_efetuar = []
-                
-                # último id
-                reserva_a_efetuar.append(ultimo_id + 1)
-
-                # hora escolhida
-                campo_escolhido = 0
-                if opcao <= 6:
-                    campo_escolhido = 1
-                    hora_escolhida = horarios_semana[opcao - 1]
-                elif opcao > 6 and opcao <= 12:
-                    campo_escolhido = 2
-                    hora_escolhida = horarios_semana[opcao - 7]
-                elif opcao > 12 and opcao <= 18:
-                    campo_escolhido = 3
-                    hora_escolhida = horarios_semana[opcao - 13]
-
-                hora_escolhida = datetime.strptime(hora_escolhida, "%Hh%M")
-                # colocar a data de teste -> 16/04
-                hora_escolhida = hora_escolhida.replace(year = 2024, month = 4, day = 16)
-                
-                reserva_a_efetuar.append(hora_escolhida)
-                
-                # ver outros casos
-                estado = "Reservado"
-                for linha in linhas:
-                    if linha['estado'] == "Reservado" and linha['horario'] == hora_escolhida and linha['cliente_utilizador_email'] != utilizador['email'] and linha['campo_id_campo'] == campo_escolhido:
-                        estado = "Em Espera"
-
-                reserva_a_efetuar.append(estado)
-                
-                # determinar custo
-                tipo_dia = "Dia de semana"
-                tipo_horario = "Normal"
-                if hora_escolhida.isoweekday() >= 6:
-                    tipo_dia = "Fim de semana"
-                if hora_escolhida.hour >= 18 and tipo_dia == "Dia de semana":
-                    tipo_horario = "Nobre"
-                
-                buscar_lista_preco = """
-                    SELECT id_custo
-                    FROM price 
-                    WHERE ativo = True AND tipo_dia = %s AND horario = %s 
-                """
-                cursor.execute(buscar_lista_preco, (tipo_dia, tipo_horario))
-                id_custo = cursor.fetchone()[0]
-
-                reserva_a_efetuar.append(id_custo)
-
-                reserva_a_efetuar.append(campo_escolhido)
-
-                reserva_a_efetuar.append(utilizador['email'])
-
-                print(" * A seguinte reserva será efetuada: ", reserva_a_efetuar)
-
-                efetua_reserva = "INSERT INTO reserva VALUES (%s, %s, %s, %s, %s, %s)"
-                cursor.execute(efetua_reserva, reserva_a_efetuar)
-                connection.commit()
-
-                print(" * \n * Reserva efetuada com sucesso! * ")
-                input(" * \n * Regressar - Enter")
+            efetuar_reserva(connection, utilizador)
 
         elif opcao == 3:
-            # mostra reservas futuras
+            reservas_atuais(connection, utilizador)
 
-            fetch_reservas_user = """
-                SELECT horario, estado, price_id_custo, campo_id_campo
-                FROM reserva
-                WHERE cliente_utilizador_email = %s
-                ORDER BY campo_id_campo, horario
-            """
+        elif opcao == 4:
+            historico_reservas(connection, utilizador)
 
-            cursor.execute(fetch_reservas_user, (utilizador['email'],))
-            linhas = cursor.fetchall()
+        elif opcao == 5:
+            return None
 
-            os.system('cls')
-            print(" ***** Reservas Futuras - Padel Mondego *****\n *")
+# ------------------------------------
+def efetuar_reserva(connection, utilizador):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    # update das datas das reservas para teste!
+    #custom_date = datetime(year = 2024, month = 4, day = 16)
+    #update_query = f"UPDATE reserva SET horario = '{custom_date.strftime('%Y-%m-%d')}'"
+    #cursor.execute(update_query)
+    #connection.commit()
+
+    date = datetime(year = 2024, month = 4, day = 16) # colocando a hora também conta para o ">="
+    fetch_reservas_hoje = """
+        SELECT *
+        FROM reserva
+        WHERE horario >= %s AND (estado = 'Reservado' OR estado = 'Em Espera')
+        ORDER BY campo_id_campo, horario, estado DESC
+    """
+
+    # executar querys
+    cursor.execute(fetch_reservas_hoje, (date,))
+    reservas_hoje = cursor.fetchall()
+    
+    os.system('cls')
+    print(" ***** Reserva de campo no Padel Mondego *****\n *")
+    #print(" * Campos Disponíveis para hoje,", datetime.now().strftime("%d/%m"))
+    print(" * Campos para hoje, 16/04, HORAS (SÓ MOSTRAR A PARTIR DA HORA ATUAL)") # teste
+    
+    print(" * São as horas que estiverem na atualização! (15h00 = nenhum atualiza)")
+    hora_atual = datetime(year = 2024, month = 4, day = 16, hour = 15, minute = 00, second = 00)
+
+    # listar todos os campos e todos os horários
+    # estados: reservado; cancelado; finalizado; em espera; em espera cancelado; alterado reservado; alterado finalizado
+
+    # ALTERAR ESTE ARRAY!! ESSA É A SOLUÇÃO!
+    horarios_semana = ["15h00", "16h30", "18h00", "19h30", "21h00", "22h30"]
+    horarios_fds = ["10h", "11h30", "13h", "14h30", "16h", "17h30", "19h", "20h30"]
+
+    print(" * \n * Campo - 1 * \n * ")
+    i = 1
+    count_slots_mostrados = 0
+    for horario_semana in horarios_semana:
+        reservado = False
+        # tecnicamente não será necessário este "if" (só apareceram a partir da hora atual)
+        #if hora_atual.hour < int(horario_semana[:2]) or (hora_atual.hour == int(horario_semana[:2]) and hora_atual.minute <= int(horario_semana[3:])):
+        for reserva_hoje in reservas_hoje:
+            if reserva_hoje['campo_id_campo'] == 1 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
+                if reserva_hoje['estado'] == 'Reservado':
+                    print(" * ", i, " - ", horario_semana, " | Reservado", " | ", reserva_hoje['cliente_utilizador_email'])
+                    reservado = True
+                    break
+        if not reservado:
+            print(" * ", i, " - ", horario_semana, " | Livre")
+        i += 1
+        count_slots_mostrados += 1
+
+    print(" * \n * Campo - 2 * \n * ")
+    for horario_semana in horarios_semana:
+        reservado = False
+        for reserva_hoje in reservas_hoje:
+            if reserva_hoje['campo_id_campo'] == 2 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
+                if reserva_hoje['estado'] == 'Reservado':
+                    print(" * ", i, " - ", horario_semana, " | Reservado", " | ", reserva_hoje['cliente_utilizador_email'])
+                    reservado = True
+                    break
+        if not reservado:
+            print(" * ", i, " - ", horario_semana, " | Livre")
+        i += 1
+
+    print(" * \n * Campo - 3 * \n * ")
+    for horario_semana in horarios_semana:
+        reservado = False
+        for reserva_hoje in reservas_hoje:
+            if reserva_hoje['campo_id_campo'] == 3 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
+                if reserva_hoje['estado'] == 'Reservado':
+                    print(" * ", i, " - ", horario_semana, " | Reservado", " | ", reserva_hoje['cliente_utilizador_email'])
+                    reservado = True
+                    break
+        if not reservado:
+            print(" * ", i, " - ", horario_semana, " | Livre")
+        i += 1
+
+    print(" *\n * Outras opções *\n * ")
+    print(" * ", i, " - Selecionar outro dia")
+    print(" * ", i + 1, " - Regressar")
+
+    # garantir que opção é válida + não reservar um campo que o user tem reservado
+    # claro que pode é reservar outros campos que estejam já reservados (ficam Em Espera)
+    opcao = 0
+    nao_pode_fazer_reserva = False
+    regressar = False
+    while opcao < 1 or opcao > i + 1 or nao_pode_fazer_reserva:
+        opcao = int(input(" *\n * Escolha uma opção -> "))
+
+        campo_escolhido = 0
+        # campo 1
+        if opcao <= count_slots_mostrados:
+            hora_escolhida = horarios_semana[opcao - 1]
+            campo_escolhido = 1
+        
+        # campo 2
+        elif opcao > count_slots_mostrados and opcao <= 2 * count_slots_mostrados:
+            hora_escolhida = horarios_semana[opcao - 7]
+            campo_escolhido = 2
+
+        # campo 3
+        elif opcao > 2 * count_slots_mostrados and opcao <= 3 * count_slots_mostrados:
+            hora_escolhida = horarios_semana[opcao - 13]
+            campo_escolhido = 3
+        
+        # outro dia
+        elif opcao == i:
+            efetuar_reserva_outro_dia(connection, utilizador, date)
+
+        # regressar
+        elif opcao == i + 1:
+            regressar = True
+            break
+        
+        # verificação que não reserva um campo já reservado
+        # verificação que não fica em espera para um campo já em espera
+        for reserva_hoje in reservas_hoje:
+            nao_pode_fazer_reserva = False
+            if reserva_hoje['campo_id_campo'] == campo_escolhido and reserva_hoje['horario'].strftime("%Hh%M") == hora_escolhida and reserva_hoje['cliente_utilizador_email'] == utilizador['email'] and reserva_hoje['estado'] == 'Reservado':
+                nao_pode_fazer_reserva = True
+                print(" * \n * ATENÇÃO -> Não pode reservar um campo que já reservou! * ")
+                break
+            if reserva_hoje['campo_id_campo'] == campo_escolhido and reserva_hoje['horario'].strftime("%Hh%M") == hora_escolhida and reserva_hoje['cliente_utilizador_email'] != utilizador['email'] and reserva_hoje['estado'] == 'Reservado':
+                for res_hoje in reservas_hoje:
+                    if res_hoje['horario'].strftime("%Hh%M") == hora_escolhida and res_hoje['cliente_utilizador_email'] == utilizador['email'] and res_hoje['campo_id_campo'] == campo_escolhido and res_hoje['estado'] == 'Em Espera':
+                        print(" * \n * ATENÇÃO -> Já está em espera para este campo! * ")
+                        nao_pode_fazer_reserva = True
+                        break
+                if nao_pode_fazer_reserva:
+                    break
+        
+        if opcao < 1 or opcao > i + 1:
+            print(" * \n * ATENÇÃO -> Opção inválida! *")
+
+    if not regressar:
+    
+        # efetuar reserva: "id_reserva, horario, estado, price_id_custo, campo_id_campo, cliente_utilizador_email"
+        reserva_a_efetuar = []
+        
+        # basta modificar o tipo do PK para autoincremento
+        fetch_maior_id = """
+            SELECT MAX(id_reserva)
+            FROM reserva
+        """
+        cursor.execute(fetch_maior_id)
+        ultimo_id = cursor.fetchone()[0]
+
+        # último id
+        reserva_a_efetuar.append(ultimo_id + 1)
+
+        # hora escolhida
+        hora_escolhida = datetime.strptime(hora_escolhida, "%Hh%M")
+        # colocar a data de teste -> 16/04
+        hora_escolhida = hora_escolhida.replace(year = 2024, month = 4, day = 16)
+        
+        reserva_a_efetuar.append(hora_escolhida)
+        
+        # estado (Reservado ou Em Espera)
+        estado = "Reservado"
+        for reserva_hoje in reservas_hoje:
+            if reserva_hoje['horario'] == hora_escolhida and reserva_hoje['cliente_utilizador_email'] != utilizador['email'] and reserva_hoje['campo_id_campo'] == campo_escolhido:
+                estado = "Em Espera"
+
+        reserva_a_efetuar.append(estado)
+        
+        # custo
+        tipo_dia = "Dia de semana"
+        tipo_horario = "Normal"
+        if hora_escolhida.isoweekday() >= 6:
+            tipo_dia = "Fim de semana"
+        if hora_escolhida.hour >= 18 and tipo_dia == "Dia de semana":
+            tipo_horario = "Nobre"
+        
+        buscar_lista_preco = """
+            SELECT id_custo, preco_atual
+            FROM price 
+            WHERE ativo = True AND tipo_dia = %s AND horario = %s
+        """
+        cursor.execute(buscar_lista_preco, (tipo_dia, tipo_horario))
+        linha = cursor.fetchone()
+        id_custo = linha[0]
+        preco_reserva = linha[1]
+
+        reserva_a_efetuar.append(id_custo)
+
+        reserva_a_efetuar.append(campo_escolhido)
+
+        reserva_a_efetuar.append(utilizador['email'])
+
+        if estado == "Em Espera":
+            print(" * Ficará em espera para o slot: ", hora_escolhida.strftime("%d/%m"), " | ", hora_escolhida.strftime("%Hh%M"), " | Campo -", campo_escolhido)
+        else:
+            print(" * A seguinte reserva será efetuada: ", hora_escolhida.strftime("%d/%m"), " | ", hora_escolhida.strftime("%Hh%M"), " | ", preco_reserva, "€ | Campo -", campo_escolhido)
+
+        efetua_reserva = "INSERT INTO reserva VALUES (%s, %s, %s, %s, %s, %s)"
+        cursor.execute(efetua_reserva, reserva_a_efetuar)
+        connection.commit()
+
+        print(" * \n * Reserva efetuada com sucesso! * ")
+        input(" * \n * Regressar - Enter")
+
+# ------------------------------------
+def efetuar_reserva_outro_dia(connection, utilizador, date):
+
+    os.system('cls')
+    print(" ***** Reserva de campo no Padel Mondego *****\n *")
+    print(" * Selecione o dia que quer reservar *\n * ")
+    
+    # subsituir por dia atual
+    # e corrigir o facto de mudar de mês :/
+    dia = date.day
+    for j in range(dia, dia + 7):
+        print(" * ", j , " - ", date.replace(day = j).strftime("%d/%m"))
+    
+    print(" * \n * ", j + 1, " - Regressar")
+
+    opcao = 0
+    while opcao < 1 or opcao > j + 1:
+        opcao = int(input(" * Escolha uma opção -> "))
+
+        if opcao == j + 1:
+            break
+        else:
+            dia_escolhido = opcao + dia
+            break
+    print(" * \n * Dia escolhido -> ", dia_escolhido, "\n * ")
+    input(" * \n * Regressar - Enter")
+    
+# ------------------------------------
+def reservas_atuais(connection, utilizador):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    # mostra reservas futuras
+    fetch_reservas_user = """
+        SELECT *
+        FROM reserva
+        WHERE cliente_utilizador_email = %s
+        ORDER BY campo_id_campo, horario
+    """
+
+    cursor.execute(fetch_reservas_user, (utilizador['email'],))
+    reservas_futuras = cursor.fetchall()
+
+    os.system('cls')
+    print(" ***** Reservas Futuras - Padel Mondego *****\n *")
+    print(" * Neste menu é possível:")
+    print(" * * Consultar as reservas atuais")
+    print(" * * Cancelar uma reserva (escolher)")
+    print(" * * Consultar reservas em espera\n *")
+    
+    i = 1
+    for reserva_futura in reservas_futuras:
+        if reserva_futura['estado'] == "Reservado":
+            print(f" * {i}. Campo - {reserva_futura['campo_id_campo']} * ")
+            i += 1
+
+        else:
+            print(f" * *  Campo - {reserva_futura['campo_id_campo']} * ")
             
-            for linha in linhas:
-                print(" * Campo - ", linha['campo_id_campo'], " * ")
+        buscar_preco = """
+            SELECT preco_atual
+            FROM price 
+            WHERE id_custo = %s 
+        """
+        cursor.execute(buscar_preco, (reserva_futura['price_id_custo'],))
+        preco = cursor.fetchone()[0]
 
-                buscar_preco = """
-                    SELECT preco_atual
-                    FROM price 
-                    WHERE id_custo = %s 
-                """
-                cursor.execute(buscar_preco, (linha['price_id_custo'],))
-                preco = cursor.fetchone()[0]
+        print(" *   ", reserva_futura['horario'].strftime("%d/%m"), ", ", reserva_futura['horario'].strftime("%Hh%M"), " | ", preco, "€ | ", reserva_futura['estado'], "\n *")
 
-                print(" * ", linha['horario'].strftime("%d/%m"), " | ", linha['horario'].strftime("%Hh%M"), " | ", preco, "€ | ", linha['estado'], "\n *")
+    print(f" * {i}. Regressar")
 
-            input(" * \n * Regressar - Enter")
+    opcao = 0
+    while opcao < 1 or opcao > i + 1:
+        opcao = int(input(" * \n * Escolha uma opção -> "))
 
+        if opcao == i:
+            break
+        
+        id_reserva_cancelar = reservas_futuras[opcao - 1]['id_reserva']
+
+        # estado fica "Cancelado"
+        cancelar_reserva = """
+            UPDATE reserva
+            SET estado = 'Cancelado'
+            WHERE id_reserva = %s
+        """
+        cursor.execute(cancelar_reserva, (id_reserva_cancelar,))
+        connection.commit()
+
+        print(" * Reserva cancelada com sucesso!")
+
+        input(" * \n * Regressar - Enter")
+
+# ------------------------------------
+def historico_reservas(connection, utilizador):
+    
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    # hora atual teste -> 18h00
+    horario_atual = datetime(year = 2024, month = 4, day = 16, hour = 18, minute = 00, second = 00)
+
+    fetch_historico_reservas = """
+        SELECT horario, estado, price_id_custo, campo_id_campo, cliente_utilizador_email
+        FROM reserva
+        WHERE cliente_utilizador_email = %s AND horario < %s
+        ORDER BY horario, campo_id_campo
+    """
+    cursor.execute(fetch_historico_reservas, [(utilizador['email'],), horario_atual])
+    linhas = cursor.fetchall()
+
+    os.system('cls')
+    print(" ***** Hisórico de Reservas - Padel Mondego *****\n *")
+
+    for linha in linhas:
+        print(" *  Campo", linha['campo_id_campo'], "- ", linha['horario'].strftime("%d/%m"), " * ")
+
+        buscar_preco = """
+            SELECT preco_atual
+            FROM price 
+            WHERE id_custo = %s 
+        """
+        cursor.execute(buscar_preco, (linha['price_id_custo'],))
+        preco = cursor.fetchone()[0]
+
+        print(" * ", linha['horario'].strftime("%Hh%M"), " | ", preco, "€", " | ", linha['estado'], "\n *")
+
+    input(" * \n * Regressar - Enter")
+
+# ------------------------------------
 # retorna "super_admin", "admin" ou "cliente"
 def tipo_utilizador(connection, utilizador):
 
@@ -486,16 +615,16 @@ def register(connection):
         user_cliente = []
 
         print(" * \n * ")
-        nif = str(9999999)
-        while len(nif) >= 7 or not nif.isdigit():
+        nif = str(9999999999)
+        while len(nif) > 9 or not nif.isdigit():
             nif = input(" * NIF: ")
-            if len(nif) >= 7 or not nif.isdigit():
+            if len(nif) > 9 or not nif.isdigit():
                 print("\n *** ATENÇÃO -> NIF inválido! ***")
 
-        telemovel = str(9999999)
-        while len(telemovel) >= 7 or not telemovel.isdigit():
+        telemovel = str(9999999999)
+        while len(telemovel) > 9 or not telemovel.isdigit():
             telemovel = input(" * Telemóvel: ")
-            if len(telemovel) >= 7 or not telemovel.isdigit():
+            if len(telemovel) > 9 or not telemovel.isdigit():
                 print("\n *** ATENÇÃO -> Telemóvel inválido! ***")
 
         user_cliente.append(nif)
@@ -531,7 +660,7 @@ def apresentar_menu_cliente():
     print(" * 2 - Reservar Campo")
     print(" * 3 - Reservas atuais")
     print(" * 4 - Histórico de Reservas")
-    print(" * 5 - Logout\n *")
+    print(" * 5 - Logout | Sair\n *")
 
     opcao = 0
     while opcao < 1 or opcao > 5:
@@ -542,7 +671,7 @@ def apresentar_menu_cliente():
 # ------------------------------------
 def menu():
 
-    print("***** Padel Mondego *****\n")
+    print(" ***** Padel Mondego *****\n")
     print(" * Bem Vindo à mais recente aplicação de reservas de campos de Padel")
     print(" * ")
     print(" * 1 - Login")
@@ -554,6 +683,34 @@ def menu():
         opcao = int(input(" * Escolha uma opção -> "))
 
     return opcao
+
+# ------------------------------------
+def atualiza_campos(connection):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    # recebe hora atual
+    # current_datetime = datetime.now()
+
+    current_datetime = datetime(year = 2024, month = 4, day = 16, hour = 14, minute = 00, second = 00)
+    diferenca = current_datetime - timedelta(hours = 1, minutes = 30)
+
+    # dar update das reservas em que já passou 1h30
+    # imaginemos -> jogo das 15h e são 16h50
+    # 16h50 - 1h30 = 15h20; logo, horario (15h) < 15h20 
+    update_jogos_a_decorrer = """
+        UPDATE reserva
+        SET estado = 'Finalizado'
+        WHERE estado = 'Reservado' AND horario < %s
+    """
+
+    cursor.execute(update_jogos_a_decorrer, (diferenca,))
+    connection.commit()
+
+    if cursor.rowcount > 0:
+        print("Fields updated successfully\n\n")
+    else:
+        print("\n")
 
 # ------------------------------------
 def database_connection():
@@ -571,7 +728,7 @@ def database_connection():
         cursor = connection.cursor()
         cursor.execute("SELECT version();")
         record = cursor.fetchone()
-        print("You are connected to - ", record, "\n")
+        print("You are connected to - ", record)
         return connection
 
     except (Exception, psycopg2.Error) as error:

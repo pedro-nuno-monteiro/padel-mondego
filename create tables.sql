@@ -1,12 +1,12 @@
 CREATE TABLE cliente (
-	nif		 NUMERIC(8,2),
-	numero_telefone	 NUMERIC(8,2),
+	nif		 NUMERIC(9,0),
+	numero_telefone	 NUMERIC(9,0),
 	utilizador_email VARCHAR(512),
 	PRIMARY KEY(utilizador_email)
 );
 
 CREATE TABLE reserva (
-	id_reserva		 NUMERIC(8,2),
+	id_reserva		 SERIAL,
 	horario			 TIMESTAMP,
 	estado			 TEXT,
 	price_id_custo		 INTEGER NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE reserva (
 );
 
 CREATE TABLE mensagem (
-	id_mensagem			 NUMERIC(8,2),
+	id_mensagem			 SERIAL,
 	assunto			 TEXT,
 	conteudo			 TEXT,
 	data_envio			 DATE,
@@ -25,7 +25,7 @@ CREATE TABLE mensagem (
 );
 
 CREATE TABLE administrador (
-	admin_id	 NUMERIC(8,2),
+	admin_id	 SERIAL,
 	super_admin	 BOOL,
 	utilizador_email VARCHAR(512),
 	PRIMARY KEY(utilizador_email)
@@ -53,7 +53,7 @@ CREATE TABLE campo (
 );
 
 CREATE TABLE price (
-	id_custo	 INTEGER,
+	id_custo	 SERIAL,
 	tipo_dia	 VARCHAR(512),
 	horario	 VARCHAR(512),
 	data_alteracao DATE,
@@ -65,7 +65,7 @@ CREATE TABLE price (
 
 CREATE TABLE mensagem_cliente (
 	lida			 BOOL,
-	mensagem_id_mensagem	 NUMERIC(8,2),
+	mensagem_id_mensagem	 INTEGER,
 	cliente_utilizador_email VARCHAR(512),
 	PRIMARY KEY(mensagem_id_mensagem,cliente_utilizador_email)
 );
@@ -84,4 +84,3 @@ ALTER TABLE administrador ADD CONSTRAINT administrador_fk1 FOREIGN KEY (utilizad
 ALTER TABLE mensagem_cliente ADD CONSTRAINT mensagem_cliente_fk1 FOREIGN KEY (mensagem_id_mensagem) REFERENCES mensagem(id_mensagem);
 ALTER TABLE mensagem_cliente ADD CONSTRAINT mensagem_cliente_fk2 FOREIGN KEY (cliente_utilizador_email) REFERENCES cliente(utilizador_email);
 ALTER TABLE administrador_permissoes ADD CONSTRAINT administrador_permissoes_fk1 FOREIGN KEY (administrador_utilizador_email) REFERENCES administrador(utilizador_email);
-
