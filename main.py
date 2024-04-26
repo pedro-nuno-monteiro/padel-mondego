@@ -2,7 +2,8 @@ import psycopg2
 import psycopg2.extras
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+from prettytable import PrettyTable
 
 def main():
     os.system('cls')
@@ -26,7 +27,6 @@ def main():
 
             # definir o tipo de utilizador
             tipo_user = tipo_utilizador(connection, utilizador)
-            break
 
         elif opcao == 2:
             register(connection)
@@ -34,16 +34,392 @@ def main():
         elif opcao == 3:
             sair()
             break
-
-    if tipo_user == 'admin':
-        menu_admin(connection)
-    elif tipo_user == 'super_admin':
-        menu_super_admin(connection)
-    else:
-        menu_cliente(connection, utilizador)
+        
+        if tipo_user == 'admin' or tipo_user == 'super_admin':
+            menu_admin(connection, utilizador, tipo_user)
+        else:
+            menu_cliente(connection, utilizador)
 
     print("adeus")
 
+# ------------------------------------
+def menu_admin(connection, utilizador, tipo_user):
+    
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    print(" ***** Menu Admin *****\n *")
+    print(" * 1 - Alterar Reservas")
+    print(" * 2 - Alterar Preços")
+    print(" * 3 - Estatísticas")
+    print(" * 4 - Mensagem Geral")
+    print(" * 5 - Mensagem Privada")
+
+    opcao = 1 
+    while opcao > 0 or opcao < 7:
+        opcao = apresentar_menu_admin(tipo_user)
+
+        if opcao == 1:
+            alterar_reservas_menu(connection)
+        
+        elif opcao == 2:
+            alterar_precos(connection)
+
+        elif opcao == 3:
+            print("estatísticas")
+
+        elif opcao == 4:
+            print("mensagem geral")
+        
+        elif opcao == 5:
+            print("mensagem privada")
+
+        elif opcao == 6:
+            os.system('cls')
+            return None
+
+# ------------------------------------
+def alterar_precos(connection):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+    os.system('cls')
+    print(" ***** Alterar Preços *****\n *\n")
+
+    fetch_precos = """
+        SELECT *
+        FROM price
+        ORDER BY ativo DESC, tipo_dia, horario DESC, data_alteracao
+    """
+
+    cursor.execute(fetch_precos)
+    precos_totais = cursor.fetchall()
+    precos_atuais = []
+    table = PrettyTable()
+    table.field_names = ["#", "Tipo Dia", "Horário", "Data Alteração", "Preço Antigo", "Preço Atual"]
+    for i, preco in enumerate(precos_totais, start = 1):
+        if preco['ativo']:
+            precos_atuais.append(preco)
+            apresentar_preco_antigo = f"{preco['valor_antigo']} €"
+            apresentar_preco = f"{preco['preco_atual']} €"
+            table.add_row([i, preco['tipo_dia'], preco['horario'], preco['data_alteracao'].strftime("%d/%m"), apresentar_preco_antigo, apresentar_preco])
+
+    print(table)
+
+    print(" \n * 4. Ver histórico total")
+    print(" * 5. Regressar")
+
+    opcao = 0
+    regressar = False
+    while opcao < 1 or opcao > 5:
+        opcao = int(input(" * \n * Escolha uma opção -> "))
+
+        if opcao < 4:
+            preco_a_alterar = precos_atuais[opcao - 1]
+            break
+
+        elif opcao == 4:
+            
+            os.system('cls')
+            print(" ***** Histórico de Preços *****\n ")
+            table_2 = PrettyTable()
+            table_2.field_names = ["Tipo Dia", "Horário", "Data Alteração", "Preço Antigo", "Preço Atual", "Ativo"]
+            count_ativo = 0
+            for preco in precos_totais:
+                if preco['ativo']:
+                    ativo = "Sim"
+                    count_ativo += 1
+                else:
+                    ativo = "Não"
+                apresentar_preco_antigo = f"{preco['valor_antigo']} €"
+                apresentar_preco = f"{preco['preco_atual']} €"
+                if count_ativo == 3:
+                    count_ativo = 0
+                    table_2.add_row([preco['tipo_dia'], preco['horario'],
+                                preco['data_alteracao'].strftime("%d/%m"), apresentar_preco_antigo, apresentar_preco, ativo], divider = True)
+                else:
+                    table_2.add_row([preco['tipo_dia'], preco['horario'],
+                                preco['data_alteracao'].strftime("%d/%m"), apresentar_preco_antigo, apresentar_preco, ativo])
+
+            print(table_2)
+            regressar = True
+            input("\n Regressar - Enter")
+            
+        elif opcao == 5:
+            regressar = True
+            break
+
+    if not regressar:
+        os.system('cls')
+        print(" ***** Alterar Preço *****\n *")
+        print(" * Preço a alterar:\n *")
+
+        table_3 = PrettyTable()
+        table_3.field_names = ["Tipo Dia", "Horário", "Data Alteração", "Preço Antigo", "Preço Atual"]
+        apresentar_preco = f"{preco_a_alterar['preco_atual']} €"
+        apresentar_preco_antigo = f"{preco_a_alterar['valor_antigo']} €"
+        table_3.add_row([preco_a_alterar['tipo_dia'], preco_a_alterar['horario'],
+                        preco_a_alterar['data_alteracao'].strftime("%d/%m"), apresentar_preco_antigo, apresentar_preco])
+
+        print(table_3)
+
+        novo_preco = preco_a_alterar['preco_atual']
+        while novo_preco < 0 or novo_preco == preco_a_alterar['preco_atual']:
+            novo_preco = int(input("\n * Indique o novo preço -> "))
+
+            if novo_preco == preco_a_alterar['preco_atual']:
+                print(" * \n * ATENÇÃO -> Preço igual ao anterior! * ")
+
+        # acrescenta novo preco
+        proximo_id_custo = max([preco['id_custo'] for preco in precos_totais]) + 1
+        data_alteracao = date(year = 2024, month = 4, day = 16)
+        atualizar_preco = """
+            INSERT INTO price (id_custo, tipo_dia, horario, data_alteracao, ativo, valor_antigo, preco_atual)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(atualizar_preco, (proximo_id_custo, preco_a_alterar['tipo_dia'], preco_a_alterar['horario'],
+                                        data_alteracao, True, preco_a_alterar['preco_atual'], novo_preco))
+        connection.commit()
+
+        # altera o anterior
+        alterar_preco = """
+            UPDATE price
+            SET ativo = False
+            WHERE id_custo = %s
+        """
+        cursor.execute(alterar_preco, (preco_a_alterar['id_custo'],))
+        connection.commit()
+
+        print(" * Preço atualizado com sucesso!")
+        input(" * \n * Regressar - Enter")
+
+# ------------------------------------
+def alterar_reservas_menu(connection):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    data_teste = datetime(year = 2024, month = 4, day = 16, hour = 14, minute = 00, second = 00)
+
+    fetch_reservas_futuras = """
+        SELECT 
+            u.email, u.nome, r.id_reserva, r.horario AS r_horario, 
+            r.estado, r.campo_id_campo, p.tipo_dia, p.horario AS p_horario, p.preco_atual
+        FROM 
+            reserva as r, price as p, utilizador as u
+        WHERE 
+            r.horario >= %s AND u.email = r.cliente_utilizador_email AND r.price_id_custo = p.id_custo
+        ORDER BY
+            u.email, r.horario, r.campo_id_campo
+    """
+    
+    #cursor.execute(fetch_reservas_futuras, (datetime.now(),))
+    cursor.execute(fetch_reservas_futuras, (data_teste,))
+    reservas_futuras = cursor.fetchall()
+
+    os.system("cls")
+    print(" ***** Alterar Reservas *****\n *")
+    print(" * Neste menu é possível:")
+    print(" * * Alterar reservas")
+    print(" * * Cancelar reservas\n ")
+
+    table = PrettyTable()
+    table.field_names = ["#", "Cliente", "Email", "Horário", "Campo", "Estado"]
+
+    current_user = reservas_futuras[0]['email']
+    for i, reserva_futura in enumerate(reservas_futuras, start = 1):
+
+        if i + 1 < len(reservas_futuras):
+            next_user = reservas_futuras[i]['email']
+            if next_user != current_user:
+                table.add_row([i, reserva_futura['nome'], reserva_futura['email'],
+                        reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), reserva_futura['campo_id_campo'],
+                        reserva_futura['estado']], divider = True)
+            else:
+                table.add_row([i, reserva_futura['nome'], reserva_futura['email'],
+                        reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), reserva_futura['campo_id_campo'],
+                        reserva_futura['estado']])
+        else:
+            table.add_row([i, reserva_futura['nome'], reserva_futura['email'],
+                        reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), reserva_futura['campo_id_campo'],
+                        reserva_futura['estado']])
+
+    print(table)
+
+    print(f"\n * {len(reservas_futuras) + 1}. Regressar")
+
+    opcao = 0
+    regressar = False
+    while opcao < 1 or opcao > len(reservas_futuras) + 1:
+        opcao = int(input(" * \n * Escolha uma reserva -> "))
+
+        if opcao == len(reservas_futuras) + 1:
+            regressar = True
+            break
+
+        elif opcao < len(reservas_futuras) + 1:
+            print(" * \n * 1 - Alterar Reserva")
+            print(" * 2 - Cancelar Reserva")
+            print(" * 3 - Regressar\n * ")
+
+            opcao_admin = 0
+            while opcao_admin < 1 or opcao_admin > 3:
+                opcao_admin = int(input(" * Escolha uma opção -> "))
+                
+                if opcao_admin == 3:
+                    regressar = True
+                    break
+
+            reserva_a_alterar = reservas_futuras[opcao - 1]
+
+    if not regressar:
+        
+        # alterar reserva
+        if opcao_admin == 1:
+            alterar_reservas(connection, reserva_a_alterar, reservas_futuras)
+
+        elif opcao_admin == 2:
+            
+            ja_cancelado = False
+            if reserva_a_alterar['estado'] == 'Cancelado':
+                print(" * \n * ATENÇÃO -> Reserva já cancelada! * ")
+                input(" * \n * Regressar - Enter")
+                ja_cancelado = True
+
+            if not ja_cancelado:
+                cancelar_reserva = """
+                    UPDATE reserva
+                    SET estado = 'Cancelado'
+                    WHERE id_reserva = %s
+                """
+                cursor.execute(cancelar_reserva, (reserva_a_alterar['id_reserva'],))
+                connection.commit()
+
+                print(" * Reserva cancelada com sucesso!")
+                input(" * \n * Regressar - Enter")
+
+# ------------------------------------
+def alterar_reservas(connection, reserva_a_alterar, reservas_futuras):
+    
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    os.system("cls")
+    print(" ***** Alterar Reserva *****\n *")
+    print(" * Reserva a alterar:\n")
+    
+    table_2 = PrettyTable()
+    table_2.field_names = ["Cliente", "Email", "Horário", "Situação", "Preço", "Campo", "Estado"]
+    apresentar_situacao = f"{reserva_a_alterar['tipo_dia']}, {reserva_a_alterar['p_horario']}"
+    apresentar_preco = f"{reserva_a_alterar['preco_atual']} €"
+    table_2.add_row([reserva_a_alterar['nome'], reserva_a_alterar['email'],
+                reserva_a_alterar['r_horario'].strftime("%d/%m, %Hh%M"), apresentar_situacao,
+                apresentar_preco, reserva_a_alterar['campo_id_campo'], reserva_a_alterar['estado']])
+    print(table_2)
+
+    print("\n * 1. Alterar Campo")
+    print(" * 2. Alterar Dia")  
+    print(" * 3. Alterar Hora")
+    print(" * 4. Alterar Estado")
+
+    opcao_alterar = 0
+    while opcao_alterar < 1 or opcao_alterar > 4:
+        opcao_alterar = int(input(" * \n * Escolha uma opção -> "))
+
+    # alterar campo
+    if opcao_alterar == 1:
+        novo_campo = reserva_a_alterar['campo_id_campo']
+
+        outros_campos = []
+        table_3 = PrettyTable()
+        table_3.field_names = ["Cliente", "Email", "Horário", "Situação", "Preço", "Campo", "Estado"]
+        for reserva_futura in reservas_futuras:
+            if (reserva_futura['campo_id_campo'] != reserva_a_alterar['campo_id_campo']) and reserva_futura['r_horario'] == reserva_a_alterar['r_horario']:
+                outros_campos.append(reserva_futura['campo_id_campo'])
+                apresentar_situacao = f"{reserva_futura['tipo_dia']}, {reserva_futura['p_horario']}"
+                apresentar_preco = f"{reserva_futura['preco_atual']} €"
+                table_3.add_row([reserva_futura['nome'], reserva_futura['email'],
+                            reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), apresentar_situacao,
+                            apresentar_preco, reserva_futura['campo_id_campo'], reserva_futura['estado']], divider = True)
+        
+        if len(outros_campos) > 0:
+            print(" *\n * Reservas noutros campos, à mesma hora:\n ")
+            print(table_3)
+        
+        else:
+            print(" * \n * Não há reservas noutros campos, à mesma hora * ")
+
+        opcao_invalida = True
+        while novo_campo < 1 or novo_campo > 3 or opcao_invalida:
+
+            if len(outros_campos) == 2:
+                print(" * Todos os restantes campos estão ocupados")
+
+            else:
+                novo_campo = int(input("\n * Indique o novo campo: "))
+
+            if novo_campo == reserva_a_alterar['campo_id_campo']:
+                print(" * \n * ATENÇÃO -> Campo igual ao anterior!\n * ")
+            elif novo_campo in outros_campos:
+                print(" * \n * ATENÇÃO -> Campo já reservado! * ")
+            else:
+                opcao_invalida = False
+
+        # atualizar a reserva selecionada
+        atualizar_reserva = """
+            UPDATE reserva
+            SET campo_id_campo = %s
+            WHERE cliente_utilizador_email = %s AND horario = %s AND estado = %s
+        """
+        cursor.execute(atualizar_reserva, (novo_campo, reserva_a_alterar['email'], reserva_a_alterar['r_horario'], reserva_a_alterar['estado']))
+        connection.commit()
+
+        print(" * Campo atualizado!")
+        input(" * \n * Regressar - Enter")
+
+    # alterar dia
+    elif opcao_alterar == 2:
+        novo_dia = reserva_a_alterar['r_horario'].day
+
+        while novo_dia < novo_dia or novo_dia > (novo_dia + 7) or novo_dia == reserva_a_alterar['r_horario'].day:
+            novo_dia = int(input(" * Indique o novo dia: "))
+            
+            if novo_dia == reserva_a_alterar['r_horario'].day:
+                print(" * \n * ATENÇÃO -> Dia igual ao anterior! * ")
+    
+    # alterar hora
+    elif opcao_alterar == 3:
+        nova_hora = reserva_a_alterar['r_horario'].strftime("%Hh%M")
+        horarios_semana = ["15h00", "16h30", "18h00", "19h30", "21h00", "22h30"]
+        
+        for i in range(1, 7):
+            print(f" * {i}. {horarios_semana[i - 1]}")
+        
+        while nova_hora not in horarios_semana:
+            opcao_hora = input(" * Indique a nova hora: ")
+            nova_hora = horarios_semana[opcao_hora - 1]
+
+            if nova_hora not in horarios_semana:
+                print(" * \n * ATENÇÃO -> Hora inválida! * ")
+
+    # alterar estado
+    elif opcao_alterar == 4:
+        novo_estado = reserva_a_alterar['estado']
+        estados = ["Reservado", "Cancelado", "Finalizado", "Em Espera", "Em Espera Cancelado", "Alterado Reservado", "Alterado Finalizado"]
+
+        for i in range(1, 7):
+            print(f" * {i}. {estados[i - 1]}")
+        
+        while novo_estado not in estados or novo_estado == reserva_a_alterar['estado']:
+            opcao_estado = input(" * Indique o novo estado: ")
+            novo_estado = estados[opcao_estado - 1]
+
+            if novo_estado == reserva_a_alterar['estado']:
+                print(" * \n * ATENÇÃO -> Estado igual ao anterior! * ")
+    
+    # atualizar a reserva selecionada
+    atualizar_reserva = """
+        UPDATE reserva
+        SET %s = %s,
+        WHERE 
+    """
+# ------------------------------------
 def menu_cliente(connection, utilizador):
 
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
@@ -75,6 +451,7 @@ def menu_cliente(connection, utilizador):
             historico_reservas(connection, utilizador)
 
         elif opcao == 5:
+            os.system('cls')
             return None
 
 # ------------------------------------
@@ -419,7 +796,6 @@ def tipo_utilizador(connection, utilizador):
 
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
-    # definir linhas de sql querys
     fetch_admins = """
         SELECT *
         FROM utilizador as u, administrador as a
@@ -651,6 +1027,28 @@ def register(connection):
 def sair():
     print("a sair do programa...")
     return None
+
+# ------------------------------------
+def apresentar_menu_admin(tipo_user):
+    os.system('cls')
+    print(" ***** Menu Admin *****\n *")
+    print(" * 1 - Alterar Reservas")
+    print(" * 2 - Alterar Preços")
+    print(" * 3 - Estatísticas")
+    print(" * 4 - Mensagem Geral")
+    print(" * 5 - Mensagem Privada")
+    
+    if tipo_user == 'admin':
+        print(" * 6 - Logout | Sair\n *")
+    else:
+        print(" * 6 - Gestão de Admins")
+        print(" * 7 - Logout | Sair\n *")
+
+    opcao = 0
+    while opcao < 1 or (opcao > 6 and tipo_user == 'admin') or (opcao > 7 and tipo_user == 'super_admin'):
+        opcao = int(input(" * Escolha uma opção -> "))
+
+    return opcao
 
 # ------------------------------------
 def apresentar_menu_cliente():
