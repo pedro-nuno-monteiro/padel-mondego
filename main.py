@@ -17,6 +17,7 @@ def main():
     atualiza_campos(connection)
 
     tipo_user = None
+    registar = False
     opcao = 1
     while opcao > 0 or opcao < 3:
         opcao = menu()
@@ -29,16 +30,18 @@ def main():
             tipo_user = tipo_utilizador(connection, utilizador)
 
         elif opcao == 2:
-            register(connection)
+            utilizador = register(connection)
+            registar = True
 
         elif opcao == 3:
-            sair()
+            print(" * Até uma próxima! *")
             break
-        
-        if tipo_user == 'admin' or tipo_user == 'super_admin':
-            menu_admin(connection, utilizador, tipo_user)
-        else:
-            menu_cliente(connection, utilizador)
+
+        if not registar:
+            if tipo_user == 'Admin' or tipo_user == 'Super Admin':
+                menu_admin(connection, utilizador, tipo_user)
+            else:
+                menu_cliente(connection, utilizador)
 
     print("adeus")
 
@@ -47,16 +50,9 @@ def menu_admin(connection, utilizador, tipo_user):
     
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
-    print(" ***** Menu Admin *****\n *")
-    print(" * 1 - Alterar Reservas")
-    print(" * 2 - Alterar Preços")
-    print(" * 3 - Estatísticas")
-    print(" * 4 - Mensagem Geral")
-    print(" * 5 - Mensagem Privada")
-
     opcao = 1 
     while opcao > 0 or opcao < 7:
-        opcao = apresentar_menu_admin(tipo_user)
+        opcao = apresentar_menu_admin(tipo_user, utilizador)
 
         if opcao == 1:
             alterar_reservas_menu(connection)
@@ -65,17 +61,278 @@ def menu_admin(connection, utilizador, tipo_user):
             alterar_precos(connection)
 
         elif opcao == 3:
-            print("estatísticas")
-
+            estatisticas(connection)
+            
         elif opcao == 4:
             print("mensagem geral")
         
         elif opcao == 5:
             print("mensagem privada")
 
-        elif opcao == 6:
+        elif opcao == 6 and tipo_user == 'Admin':
             os.system('cls')
             return None
+
+        elif opcao == 6 and tipo_user == 'Super Admin':
+            gestao_admins(connection)
+            
+        elif opcao == 7 and tipo_user == 'Super Admin':
+            os.system('cls')
+            return None
+# ------------------------------------
+def gestao_admins(connection):
+    os.system('cls')
+    print(" ***** Gestão de Administradores ***** \n *")
+    print(" * 1. Ativar/Desativar Administrador")
+    print(" * 2. Adicionar/Retirar Permissões")
+    print(" * 3. Adicionar Administrador")
+    print(" * 4. Regressar")
+
+    opcao = 0
+    regressar = False
+    while opcao < 1 or opcao > 4:
+        opcao = int(input(" * \n * Escolha uma opção -> "))
+
+        if opcao == 4:
+            regressar = True
+            break
+
+    if not regressar:
+        
+        if opcao == 1:
+            
+            cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+            fetch_admins = """
+                SELECT *
+                FROM administrador
+                WHERE super_admin = False
+            """
+            cursor.execute(fetch_admins)
+            admins = cursor.fetchall()
+
+            teste = "SELECT * FROM "
+            os.system('cls')
+            print(" ***** Ativar/Desativar Administradores ***** \n *")
+            print(" * Selecione o administrador")
+            for admin in admins:
+                print(admin)
+
+
+# ------------------------------------
+def estatisticas(connection):
+    
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+    
+    os.system('cls')
+    print(" ***** Estatísticas *****\n *")
+    print(" * * Num determinado período,\n * ")
+    print(" * 1. Campo mais reservado")
+    print(" * 2. Horário mais reservado")
+    print(" * 3. Listar campos, por horário, sem reservas")
+    print(" * 4. Listar reservas canceladas")
+    print(" * 5. Listar reservas alteradas")
+    print(" * 6. Listar períodos em que os clientes pediram para receber notificação")
+    print(" * 7. Regressar")
+
+    opcao = 0
+    regressar = False
+    while opcao < 1 or opcao > 7:
+        opcao = int(input(" * \n * Escolha uma opção -> "))
+
+        if opcao == 7:
+            regressar = True
+            break
+
+    if not regressar:
+
+        if opcao == 1:
+            tipo_menu = " ***** Campo mais reservado *****\n *"
+            data_inicial, data_final = menu_periodo(tipo_menu)
+
+            fetch_reservas_periodo = """
+                SELECT *
+                FROM reserva
+                WHERE horario >= %s AND horario <= %s
+            """
+            cursor.execute(fetch_reservas_periodo, (data_inicial, data_final))
+            mais_reservas_periodo = cursor.fetchall()
+
+            count_campos = {1: 0, 2: 0, 3: 0}
+            for reserva in mais_reservas_periodo:
+                count_campos[reserva['campo_id_campo']] += 1
+
+            os.system('cls')
+            print(" ***** Campos mais reservado *****\n *")
+            print(" * Período: (", data_inicial, " a ", data_final, ")\n ")
+            sorted_count = sorted(count_campos.items(), key = lambda x: x[1], reverse = True)
+
+            table = PrettyTable()
+            table.field_names = ["Campo", "# Reservas"]
+            for campo, reservations in sorted_count:
+                if reservations > 0:
+                    table.add_row([campo, reservations])
+
+            print(table)
+            input(" \n * Regressar - Enter")
+        
+        elif opcao == 2:
+            tipo_menu = " ***** Horário mais reservado *****\n *"
+            data_inicial, data_final = menu_periodo(tipo_menu)
+
+            fetch_horarios_periodo = """
+                SELECT *
+                FROM reserva
+                WHERE horario >= %s AND horario <= %s
+            """
+            cursor.execute(fetch_horarios_periodo, (data_inicial, data_final))
+            mais_horario_periodo = cursor.fetchall()
+
+            count_horarios = {"15h00": 0, "16h30": 0, "18h00": 0, "19h30": 0, "21h00": 0, "22h30": 0}
+            for reserva in mais_horario_periodo:
+                # ATENÇÃO!! QUANDO SE CORRIGIR PARA FIM DE SEMANA TIRAR ISTO
+                if reserva['horario'].strftime("%Hh%M") not in count_horarios:
+                    continue
+                count_horarios[reserva['horario'].strftime("%Hh%M")] += 1
+
+            os.system('cls')
+            print(" ***** Horário mais reservado *****\n *")
+            print(" * Período: (", data_inicial, " a ", data_final, ")\n ")
+            sorted_count = sorted(count_horarios.items(), key = lambda x: x[1], reverse = True)
+
+            table = PrettyTable()
+            table.field_names = ["Horário", "# Reservas"]
+            for horario, reservations in sorted_count:
+                if reservations > 0:
+                    table.add_row([horario, reservations])
+
+            print(table)
+            input(" \n * Regressar - Enter")
+        
+        elif opcao == 3:
+            tipo_menu = " ***** Campos sem reservas *****\n *"
+            data_inicial, data_final = menu_periodo(tipo_menu)
+
+            fetch_horarios_periodo = """
+                SELECT *
+                FROM reserva
+                WHERE horario >= %s AND horario <= %s
+                ORDER BY campo_id_campo, horario
+            """
+            cursor.execute(fetch_horarios_periodo, (data_inicial, data_final))
+            reservas = cursor.fetchall()
+
+            numero_dias = (data_final - data_inicial).days
+
+            count_campos = {1: 0, 2: 0, 3: 0}
+            count_horarios = {"15h00": 0, "16h30": 0, "18h00": 0, "19h30": 0, "21h00": 0, "22h30": 0}
+            for reserva in reservas:
+                if reserva['estado'] == 'Reservado' or reserva['estado'] == 'Em Espera' and reserva['horario'].strftime("%Hh%M") in count_horarios:
+                    count_campos[reserva['campo_id_campo']] += 1
+
+            # falta verificar fins de semana...!
+            count_campos[1] = len(count_horarios) * numero_dias - count_campos[1]
+            count_campos[2] = len(count_horarios) * numero_dias - count_campos[2]
+            count_campos[3] = len(count_horarios) * numero_dias - count_campos[3]
+
+            os.system('cls')
+            print(" ***** Campos sem reservas *****\n *")
+            print(" * Período: (", data_inicial, " a ", data_final, ")\n ")
+            sorted_count = sorted(count_campos.items(), key = lambda x: x[1], reverse = True)
+
+            for campo, reservations in sorted_count:
+                print(f" * Campo {campo} não teve {reservations} reservas\n *")
+            
+            input(" \n * Regressar - Enter")
+        
+        elif opcao == 4:
+            tipo_menu = " ***** Reservas canceladas *****\n *"
+            data_inicial, data_final = menu_periodo(tipo_menu)
+
+            fetch_reservas_canceladas = """
+                SELECT *
+                FROM reserva
+                WHERE horario >= %s AND horario <= %s AND estado = 'Cancelado'
+                ORDER BY horario
+            """
+            cursor.execute(fetch_reservas_canceladas, (data_inicial, data_final))
+            reservas_canceladas = cursor.fetchall()
+
+            os.system('cls')
+            print(" ***** Reservas canceladas *****\n *")
+            print(" * Período: (", data_inicial, " a ", data_final, ")\n ")
+
+            table = PrettyTable()
+            table.field_names = ["Email Cliente", "Horário", "Campo"]
+            for reserva in reservas_canceladas:
+                table.add_row([reserva['cliente_utilizador_email'], reserva['horario'].strftime("%d/%m, %Hh%M"), reserva['campo_id_campo']])
+
+            print(table)
+            input(" \n * Regressar - Enter")
+        
+        elif opcao == 5:
+            tipo_menu = " ***** Reservas alteradas *****\n *"
+            data_inicial, data_final = menu_periodo(tipo_menu)
+
+            fetch_reservas_canceladas = """
+                SELECT *
+                FROM reserva
+                WHERE horario >= %s AND horario <= %s AND estado = 'Alterado Reservado' or estado = 'Alterado Finalizado'
+                ORDER BY horario
+            """
+            cursor.execute(fetch_reservas_canceladas, (data_inicial, data_final))
+            reservas_canceladas = cursor.fetchall()
+
+            os.system('cls')
+            print(" ***** Reservas canceladas *****\n *")
+            print(" * Período: (", data_inicial, " a ", data_final, ")\n ")
+
+            table = PrettyTable()
+            table.field_names = ["Email Cliente", "Horário", "Campo", "Estado"]
+            for reserva in reservas_canceladas:
+                table.add_row([reserva['cliente_utilizador_email'], reserva['horario'].strftime("%d/%m, %Hh%M"), reserva['campo_id_campo'], reserva['estado']])
+
+            print(table)
+            input(" \n * Regressar - Enter")
+        
+        elif opcao == 6:
+            print("Receber notificação")
+            input(" \n * Regressar - Enter")
+
+# ------------------------------------
+def menu_periodo(tipo_menu):
+    nao_preenchido_inicial = True
+    nao_preenchido_final = True
+    data_inicial = date(year = 2000, month = 1, day = 1)
+    data_final = date(year = 2000, month = 1, day = 1)
+    while nao_preenchido_inicial or nao_preenchido_final:
+        os.system('cls')
+        print(tipo_menu)
+        print(" * Período: (", data_inicial, " - ", data_final, ")\n *")
+
+        if nao_preenchido_inicial:
+            while True:
+                data_inicial_str = input(" * Data inicial (yyyy-mm-dd): ")
+                if data_inicial_str != "aaaa-mm-dd":
+                    try:
+                        data_inicial = date.fromisoformat(data_inicial_str)
+                        nao_preenchido_inicial = False
+                        break
+                    except ValueError:
+                        print(" * Data inválida. Insira no formato yyyy-mm-dd.")
+        
+        elif nao_preenchido_final:
+            while True:
+                data_final_str = input(" * Data final (yyyy-mm-dd): ")
+                if data_final_str != "aaaa-mm-dd":
+                    try:
+                        data_final = date.fromisoformat(data_final_str)
+                        nao_preenchido_final = False
+                        break
+                    except ValueError:
+                        print(" * \n * Data inválida. Insira no formato yyyy-mm-dd.")
+    
+    data_final = data_final + timedelta(days = 1)
+    return data_inicial, data_final
 
 # ------------------------------------
 def alterar_precos(connection):
@@ -426,14 +683,26 @@ def menu_cliente(connection, utilizador):
 
     opcao = 1
     while opcao > 0 or opcao < 5:
-        opcao = apresentar_menu_cliente()
+        opcao = apresentar_menu_cliente(utilizador)
 
         if opcao == 1:
+
+            fetch_campos = """
+                SELECT *
+                FROM campo
+            """
+            cursor.execute(fetch_campos)
+            campos = cursor.fetchall()
 
             os.system('cls')
             print(" ***** Informações do clube Padel Mondego *****\n *")
             print(" * Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n * Nunc cursus porttitor nisi a venenatis. \n * Mauris elementum tincidunt nisi eu consequat.\n * Cras tristique libero cursus sem eleifend facilisis.\n * In hac habitasse platea dictumst.")
-            print(" \n\n ")
+
+            for campo in campos:
+                print(" * \n * Campo -", campo['id_campo'])
+                print(" * ", campo['descricao'])
+
+            print(" \n")
             print(" ***** Perfil do Cliente *****\n *")
             print(" * Nome: ", utilizador['nome'])
             print(" * Email: ", utilizador['email'])
@@ -540,8 +809,6 @@ def efetuar_reserva(connection, utilizador):
     print(" * ", i, " - Selecionar outro dia")
     print(" * ", i + 1, " - Regressar")
 
-    # garantir que opção é válida + não reservar um campo que o user tem reservado
-    # claro que pode é reservar outros campos que estejam já reservados (ficam Em Espera)
     opcao = 0
     nao_pode_fazer_reserva = False
     regressar = False
@@ -708,28 +975,34 @@ def reservas_atuais(connection, utilizador):
     print(" * Neste menu é possível:")
     print(" * * Consultar as reservas atuais")
     print(" * * Cancelar uma reserva (escolher)")
-    print(" * * Consultar reservas em espera\n *")
+    print(" * * Consultar reservas em espera\n ")
     
     i = 1
+    table = PrettyTable()
+    table.field_names = ["#", "Campo", "Data", "Horário", "Preço", "Estado"]
     for reserva_futura in reservas_futuras:
-        if reserva_futura['estado'] == "Reservado":
-            print(f" * {i}. Campo - {reserva_futura['campo_id_campo']} * ")
-            i += 1
-
-        else:
-            print(f" * *  Campo - {reserva_futura['campo_id_campo']} * ")
-            
+        
         buscar_preco = """
             SELECT preco_atual
             FROM price 
-            WHERE id_custo = %s 
+            WHERE id_custo = %s
         """
         cursor.execute(buscar_preco, (reserva_futura['price_id_custo'],))
         preco = cursor.fetchone()[0]
+        apresentar_preco = f"{preco} €"
 
-        print(" *   ", reserva_futura['horario'].strftime("%d/%m"), ", ", reserva_futura['horario'].strftime("%Hh%M"), " | ", preco, "€ | ", reserva_futura['estado'], "\n *")
+        if reserva_futura['estado'] == "Reservado":
+            table.add_row([i, reserva_futura['campo_id_campo'], reserva_futura['horario'].strftime("%d/%m"),
+                        reserva_futura['horario'].strftime("%Hh%M"), apresentar_preco, reserva_futura['estado']])
+            i += 1
 
-    print(f" * {i}. Regressar")
+        else:
+            table.add_row([" ", reserva_futura['campo_id_campo'], reserva_futura['horario'].strftime("%d/%m"),
+                        reserva_futura['horario'].strftime("%Hh%M"), apresentar_preco, reserva_futura['estado']])
+
+    print(table)
+
+    print(f"\n * {i}. Regressar")
 
     opcao = 0
     while opcao < 1 or opcao > i + 1:
@@ -759,7 +1032,7 @@ def historico_reservas(connection, utilizador):
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
     # hora atual teste -> 18h00
-    horario_atual = datetime(year = 2024, month = 4, day = 16, hour = 18, minute = 00, second = 00)
+    horario_atual = datetime(year = 2024, month = 4, day = 16, hour = 23, minute = 00, second = 00)
 
     fetch_historico_reservas = """
         SELECT horario, estado, price_id_custo, campo_id_campo, cliente_utilizador_email
@@ -771,22 +1044,26 @@ def historico_reservas(connection, utilizador):
     linhas = cursor.fetchall()
 
     os.system('cls')
-    print(" ***** Hisórico de Reservas - Padel Mondego *****\n *")
+    print(" ***** Hisórico de Reservas - Padel Mondego *****\n ")
 
-    for linha in linhas:
-        print(" *  Campo", linha['campo_id_campo'], "- ", linha['horario'].strftime("%d/%m"), " * ")
-
+    table = PrettyTable()
+    table.field_names = ["Campo", "Data", "Horário", "Preço", "Estado"]
+    for reserva_futura in linhas:
+        
         buscar_preco = """
             SELECT preco_atual
             FROM price 
-            WHERE id_custo = %s 
+            WHERE id_custo = %s
         """
-        cursor.execute(buscar_preco, (linha['price_id_custo'],))
+        cursor.execute(buscar_preco, (reserva_futura['price_id_custo'],))
         preco = cursor.fetchone()[0]
+        apresentar_preco = f"{preco} €"
 
-        print(" * ", linha['horario'].strftime("%Hh%M"), " | ", preco, "€", " | ", linha['estado'], "\n *")
+        table.add_row([reserva_futura['campo_id_campo'], reserva_futura['horario'].strftime("%d/%m"),
+                        reserva_futura['horario'].strftime("%Hh%M"), apresentar_preco, reserva_futura['estado']])
 
-    input(" * \n * Regressar - Enter")
+    print(table)
+    input("\n * Regressar - Enter")
 
 # ------------------------------------
 # retorna "super_admin", "admin" ou "cliente"
@@ -798,28 +1075,26 @@ def tipo_utilizador(connection, utilizador):
 
     fetch_admins = """
         SELECT *
-        FROM utilizador as u, administrador as a
-        WHERE u.email = a.utilizador_email AND u.email = %s
+        FROM administrador
+        WHERE utilizador_email = %s
     """
-
-    # executar querys
     cursor.execute(fetch_admins, (utilizador['email'],))
     linha = cursor.fetchone()
 
     if linha is not None:
         if linha['super_admin']:
-            tipo_user = 'super_admin'
+            tipo_user = 'Super Admin'
         else:
-            tipo_user = 'admin'
+            tipo_user = 'Admin'
     else:
-        tipo_user = 'cliente'
+        tipo_user = 'Cliente'
 
     return tipo_user
 
+# ------------------------------------
 def login(connection):
 
     os.system('cls')
-
     print(" ***** Login *****")
     print(" * \n * Login com os seus dados\n *")
 
@@ -870,26 +1145,12 @@ def login(connection):
     # verifica se é admin ou cliente
     tipo_user = tipo_utilizador(connection, utilizador)
 
-    if tipo_user == 'admin':
-        utilizador['super_admin'] = False
-        tipo_user = "Admin"
-    elif tipo_user == 'super_admin':
-        utilizador['super_admin'] = True
-        tipo_user = "Super Admin"
-    elif tipo_user == 'cliente':
-        fetch_utilizadores = " SELECT nif, numero_telefone FROM cliente WHERE utilizador_email = %s"
-        cursor.execute(fetch_utilizadores, (email,))
-        nif, numero_telefone = cursor.fetchone()
-        utilizador.update({'nif': nif, 'numero_telefone': numero_telefone})
-        tipo_user = "Cliente"
-    else:
-        print("Erro na função de login!")
-        raise Exception("Erro na função de login!")
-
     print(" * \n * Bem vindo,", tipo_user, nome)
-    time.sleep(1)
+
+    input(" * \n * Regressar - Enter")
     return utilizador
 
+# ------------------------------------
 def register(connection):
     os.system('cls')
 
@@ -901,12 +1162,10 @@ def register(connection):
     # adicionar whiles de segurança
     nome = input(" * Nome: ")
 
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
     email_existe = True
     while email_existe:
         email = input(" * Email: ")
-
-        # verificar se o email/nome já existe
-        cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
         fetch_utilizadores = """
             SELECT nome, email, passe
@@ -932,7 +1191,6 @@ def register(connection):
     user.append(nome)
 
     # insere utilizador (antes de inserir admin ou cliente)
-    cursor = connection.cursor()
     insere_user = "INSERT INTO utilizador VALUES (%s, %s, %s)"
     cursor.execute(insere_user, user)
     connection.commit()
@@ -948,20 +1206,18 @@ def register(connection):
         user_admin = []
 
         # fetch último admin_id
-        cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
-
         fetch_restantes_admins = """
             SELECT a.admin_id
             FROM administrador as a
             ORDER BY a.admin_id DESC
         """
-
         cursor.execute(fetch_restantes_admins)
         linha = cursor.fetchone()
         ultimo_admin_id, = linha
 
         # atribuir características de admin
         user_admin.append(ultimo_admin_id + 1)
+
         print(" * \n * ")
         print(" * Super Admin\n * ")
         print(" * 1 - Sim")
@@ -976,16 +1232,12 @@ def register(connection):
         user_admin.append(email)
 
         # inserir utilizador + admin
-        cursor = connection.cursor()
-
-        print(" * \n * \n * Registo efetuado com os dados acima indicados! * ")
 
         insere_admin = "INSERT INTO administrador VALUES (%s, %s, %s)"
-
         cursor.execute(insere_admin, user_admin)
         connection.commit()
 
-        user.append(user_admin)
+        print(" * \n * \n * Registo efetuado com os dados acima indicados! * ")
 
     else:
         user_cliente = []
@@ -1008,52 +1260,46 @@ def register(connection):
         user_cliente.append(email)
 
         # inserir utilizador + cliente
-        cursor = connection.cursor()
-
-        print(" * \n * \n * Registo efetuado com os dados acima indicados! * ")
 
         insere_admin = "INSERT INTO cliente VALUES (%s, %s, %s)"
-
         cursor.execute(insere_admin, user_cliente)
         connection.commit()
 
-        user.append(user_cliente)
+        print(" * \n * \n * Registo efetuado com os dados acima indicados! * ")
 
-    time.sleep(2)
-    os.system('cls')
+    input(" * Regressar - Enter")
     return user
 
 # ------------------------------------
-def sair():
-    print("a sair do programa...")
-    return None
-
-# ------------------------------------
-def apresentar_menu_admin(tipo_user):
+def apresentar_menu_admin(tipo_user, utilizador):
     os.system('cls')
-    print(" ***** Menu Admin *****\n *")
+
+    if tipo_user == 'Super Admin':
+        print(" ***** Menu Super Admin", utilizador['nome'], "*****\n *")
+    else:
+        print(" ***** Menu Admin", utilizador['nome'], "*****\n *")
     print(" * 1 - Alterar Reservas")
     print(" * 2 - Alterar Preços")
     print(" * 3 - Estatísticas")
     print(" * 4 - Mensagem Geral")
     print(" * 5 - Mensagem Privada")
     
-    if tipo_user == 'admin':
+    if tipo_user == 'Admin':
         print(" * 6 - Logout | Sair\n *")
     else:
         print(" * 6 - Gestão de Admins")
         print(" * 7 - Logout | Sair\n *")
 
     opcao = 0
-    while opcao < 1 or (opcao > 6 and tipo_user == 'admin') or (opcao > 7 and tipo_user == 'super_admin'):
+    while opcao < 1 or (opcao > 6 and tipo_user == 'Admin') or (opcao > 7 and tipo_user == 'Super Admin'):
         opcao = int(input(" * Escolha uma opção -> "))
 
     return opcao
 
 # ------------------------------------
-def apresentar_menu_cliente():
+def apresentar_menu_cliente(utilizador):
     os.system('cls')
-    print(" ***** Menu Cliente *****\n *")
+    print(" ***** Menu Cliente", utilizador['nome'], " *****\n *")
     print(" * 1 - Informações e Perfil")
     print(" * 2 - Reservar Campo")
     print(" * 3 - Reservas atuais")
@@ -1068,7 +1314,7 @@ def apresentar_menu_cliente():
 
 # ------------------------------------
 def menu():
-
+    os.system('cls')
     print(" ***** Padel Mondego *****\n")
     print(" * Bem Vindo à mais recente aplicação de reservas de campos de Padel")
     print(" * ")

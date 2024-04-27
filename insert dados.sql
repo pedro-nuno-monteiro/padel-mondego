@@ -3,6 +3,8 @@ INSERT INTO utilizador (email, passe, nome) VALUES
 ('afonso@gmail.com', 'password1', 'Afonso Jorge'),
 ('luis@gmail.com', 'password2', 'Luis Pedro'),
 ('admin@gmail.com', 'admin', 'Pedro Monteiro'),
+('admin_emp1@gmail.com', 'admin', 'Empregado 1'),
+('admin_emp2@gmail.com', 'admin', 'Empregado 2'),
 ('superadmin@gmail.com', 'superadmin', 'Maria Carolina');
 
 -- tabela cliente
@@ -12,14 +14,16 @@ INSERT INTO cliente (nif, numero_telefone, utilizador_email) VALUES
 
 -- tabela admin
 INSERT INTO administrador (admin_id, super_admin, utilizador_email) VALUES
-(1, TRUE, 'admin@gmail.com'),
-(2, FALSE, 'superadmin@gmail.com');
+(1, TRUE, 'superadmin@gmail.com'),
+(2, FALSE, 'admin@gmail.com'),
+(3, FALSE, 'admin_emp1@gmail.com'),
+(4, FALSE, 'admin_emp2@gmail.com');
 
 -- tabela campo
 INSERT INTO campo (id_campo, descricao) VALUES
-(1, 'Campo 1'),
-(2, 'Campo 2'),
-(3, 'Campo 3');
+(1, 'Campo 1 - Terra e Betão'),
+(2, 'Campo 2 - Relva Sintética'),
+(3, 'Campo 3 - Areia Azul');
 
 -- tabela price
 
@@ -61,12 +65,16 @@ INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_ema
 (TRUE, 1, 'afonso@gmail.com'),
 (FALSE, 2, 'luis@gmail.com');
 
--- tabela admin_permissoes
-INSERT INTO administrador_permissoes (administrador_utilizador_email) VALUES
-('admin@gmail.com'),
-('superadmin@gmail.com');
-
 -- tabela permissoes
-INSERT INTO permissoes (alterar_preco, alterar_reserva, cancelar_reserva, conceder_cliente, remover_cliente) VALUES
-(TRUE, TRUE, TRUE, TRUE, TRUE),
-(TRUE, TRUE, TRUE, FALSE, FALSE);
+INSERT INTO permissoes (id_permissao, alterar_preco, alterar_reserva, cancelar_reserva, conceder_cliente, remover_cliente) VALUES
+(1, TRUE, TRUE, TRUE, TRUE, TRUE),
+(2, TRUE, TRUE, TRUE, FALSE, FALSE),
+(3, TRUE, TRUE, TRUE, FALSE, FALSE),
+(4, TRUE, TRUE, TRUE, FALSE, FALSE);
+
+-- tabela admin_permissoes
+INSERT INTO administrador_permissoes (administrador_utilizador_email, permissoes_id_permissao) VALUES
+('superadmin@gmail.com', 1),
+('admin@gmail.com', 2),
+('admin_emp1@gmail.com', 3),
+('admin_emp2@gmail.com', 4);
