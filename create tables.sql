@@ -1,3 +1,5 @@
+CREATE EXTENSION pgcrypto;
+
 CREATE TABLE cliente (
 	nif		 NUMERIC(9,0),
 	numero_telefone	 NUMERIC(9,0),
@@ -25,7 +27,6 @@ CREATE TABLE mensagem (
 );
 
 CREATE TABLE administrador (
-	admin_id	 SERIAL,
 	super_admin	 BOOL,
 	utilizador_email VARCHAR(512),
 	PRIMARY KEY(utilizador_email)
@@ -39,13 +40,11 @@ CREATE TABLE utilizador (
 );
 
 CREATE TABLE permissoes (
-	id_permissao	 SERIAL,
 	alterar_preco	 BOOL,
 	alterar_reserva	 BOOL,
 	cancelar_reserva BOOL,
 	conceder_cliente BOOL,
-	remover_cliente	 BOOL,
-	PRIMARY KEY(id_permissao)
+	remover_cliente	 BOOL
 );
 
 CREATE TABLE campo (
@@ -74,8 +73,7 @@ CREATE TABLE mensagem_cliente (
 
 CREATE TABLE administrador_permissoes (
 	administrador_utilizador_email VARCHAR(512),
-	permissoes_id_permissao	 INTEGER,
-	PRIMARY KEY(administrador_utilizador_email,permissoes_id_permissao)
+	PRIMARY KEY(administrador_utilizador_email)
 );
 
 ALTER TABLE cliente ADD CONSTRAINT cliente_fk1 FOREIGN KEY (utilizador_email) REFERENCES utilizador(email);
@@ -87,5 +85,4 @@ ALTER TABLE administrador ADD CONSTRAINT administrador_fk1 FOREIGN KEY (utilizad
 ALTER TABLE mensagem_cliente ADD CONSTRAINT mensagem_cliente_fk1 FOREIGN KEY (mensagem_id_mensagem) REFERENCES mensagem(id_mensagem);
 ALTER TABLE mensagem_cliente ADD CONSTRAINT mensagem_cliente_fk2 FOREIGN KEY (cliente_utilizador_email) REFERENCES cliente(utilizador_email);
 ALTER TABLE administrador_permissoes ADD CONSTRAINT administrador_permissoes_fk1 FOREIGN KEY (administrador_utilizador_email) REFERENCES administrador(utilizador_email);
-ALTER TABLE administrador_permissoes ADD CONSTRAINT administrador_permissoes_fk2 FOREIGN KEY (permissoes_id_permissao) REFERENCES permissoes(id_permissao);
 

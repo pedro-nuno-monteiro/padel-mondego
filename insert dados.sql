@@ -1,11 +1,14 @@
+-- assim
+crypt('password1', gen_salt('bf', 8));
+
 -- tabela utilizador
 INSERT INTO utilizador (email, passe, nome) VALUES
 ('afonso@gmail.com', 'password1', 'Afonso Jorge'),
 ('luis@gmail.com', 'password2', 'Luis Pedro'),
-('admin@gmail.com', 'admin', 'Pedro Monteiro'),
-('admin_emp1@gmail.com', 'admin', 'Empregado 1'),
-('admin_emp2@gmail.com', 'admin', 'Empregado 2'),
-('superadmin@gmail.com', 'superadmin', 'Maria Carolina');
+('admin', 'admin', 'Pedro Monteiro'),
+('admin1', 'admin1', 'Empregado 1'),
+('admin2', 'admin2', 'Empregado 2'),
+('sadmin', 'sadmin', 'Maria Carolina');
 
 -- tabela cliente
 INSERT INTO cliente (nif, numero_telefone, utilizador_email) VALUES
@@ -13,11 +16,11 @@ INSERT INTO cliente (nif, numero_telefone, utilizador_email) VALUES
 (987654321, 987654321, 'luis@gmail.com');
 
 -- tabela admin
-INSERT INTO administrador (admin_id, super_admin, utilizador_email) VALUES
-(1, TRUE, 'superadmin@gmail.com'),
-(2, FALSE, 'admin@gmail.com'),
-(3, FALSE, 'admin_emp1@gmail.com'),
-(4, FALSE, 'admin_emp2@gmail.com');
+INSERT INTO administrador (super_admin, utilizador_email) VALUES
+(TRUE, 'sadmin'),
+(FALSE, 'admin'),
+(FALSE, 'admin1'), -- mudar depois de testes
+(FALSE, 'admin2');
 
 -- tabela campo
 INSERT INTO campo (id_campo, descricao) VALUES
@@ -57,8 +60,8 @@ INSERT INTO reserva (id_reserva, horario, estado, price_id_custo, campo_id_campo
 
 -- tabela mensagem
 INSERT INTO mensagem (id_mensagem, assunto, conteudo, data_envio, administrador_utilizador_email) VALUES
-(1, 'Promoção de Verão', 'Não percam as nossas promoções de verão!', '2024-04-08', 'admin@gmail.com'),
-(2, 'Aviso de manutenção', 'O campo 2 estará fechado para manutenção na próxima semana!', '2024-04-09', 'admin@gmail.com');
+(1, 'Promoção de Verão', 'Não percam as nossas promoções de verão!', '2024-04-08', 'admin'),
+(2, 'Aviso de manutenção', 'O campo 2 estará fechado para manutenção na próxima semana!', '2024-04-09', 'admin1');
 
 -- tabela mensagem_cliente
 INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_email) VALUES
@@ -66,15 +69,13 @@ INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_ema
 (FALSE, 2, 'luis@gmail.com');
 
 -- tabela permissoes
-INSERT INTO permissoes (id_permissao, alterar_preco, alterar_reserva, cancelar_reserva, conceder_cliente, remover_cliente) VALUES
-(1, TRUE, TRUE, TRUE, TRUE, TRUE),
-(2, TRUE, TRUE, TRUE, FALSE, FALSE),
-(3, TRUE, TRUE, TRUE, FALSE, FALSE),
-(4, TRUE, TRUE, TRUE, FALSE, FALSE);
+INSERT INTO permissoes (alterar_preco, alterar_reserva, cancelar_reserva, conceder_cliente, remover_cliente) VALUES
+(TRUE, TRUE, TRUE, TRUE, TRUE),
+(TRUE, TRUE, TRUE, FALSE, FALSE);
 
 -- tabela admin_permissoes
-INSERT INTO administrador_permissoes (administrador_utilizador_email, permissoes_id_permissao) VALUES
-('superadmin@gmail.com', 1),
-('admin@gmail.com', 2),
-('admin_emp1@gmail.com', 3),
-('admin_emp2@gmail.com', 4);
+INSERT INTO administrador_permissoes (administrador_utilizador_email) VALUES
+('sadmin'),
+('admin'),
+('admin1'),
+('admin2');
