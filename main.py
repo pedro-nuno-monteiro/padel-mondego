@@ -4,7 +4,6 @@ import os
 import time
 from datetime import datetime, timedelta, date
 from prettytable import PrettyTable
-from colorama import Fore, Style
 
 def main():
 
@@ -137,33 +136,56 @@ def adicionar_admin(connection):
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
     fetch_clientes = """
         SELECT *
-        FROM cliente AS c, utilizador AS u, administrador AS a
-        WHERE c.utilizador_email = u.email AND a.utilizador_email <> c.utilizador_email
+        FROM cliente AS c, utilizador AS u
+        WHERE c.utilizador_email = u.email
     """ 
-    cursor.execute(fetch_clientes) # AQUI!!!!!!!!!!!1
+    cursor.execute(fetch_clientes)
     clientes = cursor.fetchall()
 
+    fetch_admins = """
+        SELECT *
+        FROM administrador AS a, utilizador AS u
+        WHERE a.utilizador_email = u.email
+    """
+    cursor.execute(fetch_admins)
+    admins = cursor.fetchall()
+
     table = PrettyTable()
+    table_admins = PrettyTable()
     table.field_names = ["#", "Nome", "Email"]
-    for i, cliente in enumerate(clientes, start = 1):
-        table.add_row([i, cliente['nome'], cliente['email']])
+    table_admins.field_names = ["#", "Nome", "Email"]
+    for j , admin in enumerate(admins, start = 1):
+        table_admins.add_row([j, admin['nome'], admin['email']])
+
+    i = 1
+    cliente_valido = []
+    for cliente in clientes:
+        if cliente['email'] not in [admin['email'] for admin in admins]:
+            table.add_row([i, cliente['nome'], cliente['email']])
+            cliente_valido.append(cliente)
+            i += 1
+        else:
+            table.add_row([" ", cliente['nome'], cliente['email']])
 
     os.system('cls')
     print(" ***** Adicionar Administrador *****\n ")
+    print(" * Administradores *\n")
+    print(table_admins)
+    print(" \n* Clientes *\n")
     print(table)
-    print(" \n * ", len(clientes) + 1, ". Regressar")
+    print(" \n * ", i , ". Regressar\n *")
 
     opcao = 0
     regressar = False
-    while opcao < 1 or opcao > len(clientes) + 1:
+    while opcao < 1 or opcao > i:
         opcao = int(input(" * Escolha um cliente -> "))
 
-        if opcao == len(clientes) + 1:
+        if opcao == i:
             regressar = True
             break
         
-        elif opcao < len(clientes) + 1:
-            cliente = clientes[opcao - 1]
+        elif opcao < i:
+            cliente = cliente_valido[opcao - 1]
             break
     
     if not regressar:
@@ -586,69 +608,104 @@ def alterar_reservas_menu(connection):
     print(" ***** Alterar Reservas *****\n *")
     print(" * Neste menu é possível:")
     print(" * * Alterar reservas")
-    print(" * * Cancelar reservas\n ")
+    print(" * * Cancelar reservas")
+    print(" * * * Reservas 'Em Espera' apenas podem ser canceladas\n")
 
     table = PrettyTable()
     table.field_names = ["#", "Cliente", "Email", "Horário", "Campo", "Estado"]
 
+    i = 1
     current_user = reservas_futuras[0]['email']
-    for i, reserva_futura in enumerate(reservas_futuras, start = 1):
-
-        if i + 1 < len(reservas_futuras):
+    numero_reservas_futuras = len(reservas_futuras)
+    
+    # lista de reservas, sem as canceladas
+    reservas_futuras_corretas = []
+    
+    for reserva_futura in reservas_futuras:
+        if i + 1 < numero_reservas_futuras:
             next_user = reservas_futuras[i]['email']
             if next_user != current_user:
-                table.add_row([i, reserva_futura['nome'], reserva_futura['email'],
+                if reserva_futura['estado'] == 'Cancelado' or reserva_futura['estado'] == 'Em Espera Cancelado':
+                    table.add_row([" ", reserva_futura['nome'], reserva_futura['email'],
                         reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), reserva_futura['campo_id_campo'],
                         reserva_futura['estado']], divider = True)
+                else:
+                    table.add_row([i, reserva_futura['nome'], reserva_futura['email'],
+                        reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), reserva_futura['campo_id_campo'],
+                        reserva_futura['estado']], divider = True)
+                    reservas_futuras_corretas.append(reserva_futura)
+                    i += 1
+            else:
+                if reserva_futura['estado'] == 'Cancelado' or reserva_futura['estado'] == 'Em Espera Cancelado':
+                    table.add_row([" ", reserva_futura['nome'], reserva_futura['email'],
+                        reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), reserva_futura['campo_id_campo'],
+                        reserva_futura['estado']])
+                else:
+                    table.add_row([i, reserva_futura['nome'], reserva_futura['email'],
+                        reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), reserva_futura['campo_id_campo'],
+                        reserva_futura['estado']])
+                    reservas_futuras_corretas.append(reserva_futura)
+                    i += 1
+            current_user = next_user                
+        else:
+            if reserva_futura['estado'] == 'Cancelado' or reserva_futura['estado'] == 'Em Espera Cancelado':
+                table.add_row([" ", reserva_futura['nome'], reserva_futura['email'],
+                    reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), reserva_futura['campo_id_campo'],
+                    reserva_futura['estado']])
             else:
                 table.add_row([i, reserva_futura['nome'], reserva_futura['email'],
                         reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), reserva_futura['campo_id_campo'],
                         reserva_futura['estado']])
-        else:
-            table.add_row([i, reserva_futura['nome'], reserva_futura['email'],
-                        reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), reserva_futura['campo_id_campo'],
-                        reserva_futura['estado']])
+                reservas_futuras_corretas.append(reserva_futura)
+                i += 1
 
     print(table)
 
-    print(f"\n * {len(reservas_futuras) + 1}. Regressar")
+    print(f"\n * {i}. Regressar")
 
     opcao = 0
     regressar = False
-    while opcao < 1 or opcao > len(reservas_futuras) + 1:
+    while opcao < 1 or opcao > i:
         opcao = int(input(" * \n * Escolha uma reserva -> "))
 
-        if opcao == len(reservas_futuras) + 1:
+        if opcao == i:
             regressar = True
             break
 
-        elif opcao < len(reservas_futuras) + 1:
-            print(" * \n * 1 - Alterar Reserva")
-            print(" * 2 - Cancelar Reserva")
-            print(" * 3 - Regressar\n * ")
+        elif opcao < i:
+
+            reserva_a_alterar = reservas_futuras_corretas[opcao - 1]
 
             opcao_admin = 0
-            while opcao_admin < 1 or opcao_admin > 3:
-                opcao_admin = int(input(" * Escolha uma opção -> "))
-                
-                if opcao_admin == 3:
-                    regressar = True
-                    break
+            if reserva_a_alterar['estado'] == 'Em Espera':
+                print(" *\n * Apenas pode cancelar esta reserva\n *")
+                input(" * \n * Proceder - Enter")
+                opcao_admin = 2
+            
+            else:
+                print(" * \n * 1 - Alterar Reserva")
+                print(" * 2 - Cancelar Reserva")
+                print(" * 3 - Regressar\n * ")
 
-            reserva_a_alterar = reservas_futuras[opcao - 1]
+                while opcao_admin < 1 or opcao_admin > 3:
+                    opcao_admin = int(input(" * Escolha uma opção -> "))
+                    
+                    if opcao_admin == 3:
+                        regressar = True
+                        break
 
     if not regressar:
         
         # alterar reserva
         if opcao_admin == 1:
-            alterar_reservas(connection, reserva_a_alterar, reservas_futuras)
+            alterar_reservas(connection, reserva_a_alterar, reservas_futuras_corretas)
 
         elif opcao_admin == 2:
             
             ja_cancelado = False
             if reserva_a_alterar['estado'] == 'Cancelado':
                 print(" * \n * ATENÇÃO -> Reserva já cancelada! * ")
-                input(" * \n * Regressar - Enter")
+                input(" * Regressar - Enter")
                 ja_cancelado = True
 
             if not ja_cancelado:
@@ -664,7 +721,7 @@ def alterar_reservas_menu(connection):
                 input(" * \n * Regressar - Enter")
 
 # ------------------------------------
-def alterar_reservas(connection, reserva_a_alterar, reservas_futuras):
+def alterar_reservas(connection, reserva_a_alterar, reservas_futuras_corretas):
     
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
@@ -684,10 +741,9 @@ def alterar_reservas(connection, reserva_a_alterar, reservas_futuras):
     print("\n * 1. Alterar Campo")
     print(" * 2. Alterar Dia")  
     print(" * 3. Alterar Hora")
-    print(" * 4. Alterar Estado")
 
     opcao_alterar = 0
-    while opcao_alterar < 1 or opcao_alterar > 4:
+    while opcao_alterar < 1 or opcao_alterar > 3:
         opcao_alterar = int(input(" * \n * Escolha uma opção -> "))
 
     # alterar campo
@@ -697,7 +753,7 @@ def alterar_reservas(connection, reserva_a_alterar, reservas_futuras):
         outros_campos = []
         table_3 = PrettyTable()
         table_3.field_names = ["Cliente", "Email", "Horário", "Situação", "Preço", "Campo", "Estado"]
-        for reserva_futura in reservas_futuras:
+        for reserva_futura in reservas_futuras_corretas:
             if (reserva_futura['campo_id_campo'] != reserva_a_alterar['campo_id_campo']) and reserva_futura['r_horario'] == reserva_a_alterar['r_horario']:
                 outros_campos.append(reserva_futura['campo_id_campo'])
                 apresentar_situacao = f"{reserva_futura['tipo_dia']}, {reserva_futura['p_horario']}"
@@ -732,10 +788,11 @@ def alterar_reservas(connection, reserva_a_alterar, reservas_futuras):
         # atualizar a reserva selecionada
         atualizar_reserva = """
             UPDATE reserva
-            SET campo_id_campo = %s
-            WHERE cliente_utilizador_email = %s AND horario = %s AND estado = %s
+            SET campo_id_campo = %s,
+                estado = 'Alterado Reservado'
+            WHERE WHERE id_reserva = %s
         """
-        cursor.execute(atualizar_reserva, (novo_campo, reserva_a_alterar['email'], reserva_a_alterar['r_horario'], reserva_a_alterar['estado']))
+        cursor.execute(atualizar_reserva, (novo_campo, reserva_a_alterar['id_reserva']))
         connection.commit()
 
         print(" * Campo atualizado!")
@@ -743,50 +800,130 @@ def alterar_reservas(connection, reserva_a_alterar, reservas_futuras):
 
     # alterar dia
     elif opcao_alterar == 2:
-        novo_dia = reserva_a_alterar['r_horario'].day
 
-        while novo_dia < novo_dia or novo_dia > (novo_dia + 7) or novo_dia == reserva_a_alterar['r_horario'].day:
-            novo_dia = int(input(" * Indique o novo dia: "))
+        # dia da reserva a alterar
+        dia = reserva_a_alterar['r_horario'].day
+        
+        # dia de hoje
+        hoje = datetime(year = 2024, month = 4, day = 16).day
+        #hoje = datetime.now().day
+
+        # ALTERAR FILTRAR AQUI!!!
+        
+        outros_dias = []
+        table_4 = PrettyTable()
+        table_4.field_names = ["Cliente", "Email", "Horário", "Situação", "Preço", "Campo", "Estado"]
+        for reserva_futura in reservas_futuras_corretas:
+            if reserva_futura['campo_id_campo'] == reserva_a_alterar['campo_id_campo'] and reserva_futura['r_horario'].strftime("%Hh%M") == reserva_a_alterar['r_horario'].strftime("%Hh%M") and reserva_futura['r_horario'].day != dia:
+                outros_dias.append(reserva_futura['r_horario'].day)
+                apresentar_situacao = f"{reserva_futura['tipo_dia']}, {reserva_futura['p_horario']}"
+                apresentar_preco = f"{reserva_futura['preco_atual']} €"
+                table_4.add_row([reserva_futura['nome'], reserva_futura['email'],
+                            reserva_futura['r_horario'].strftime("%d/%m, %Hh%M"), apresentar_situacao,
+                            apresentar_preco, reserva_futura['campo_id_campo'], reserva_futura['estado']], divider = True)
+
+        if len(outros_dias) > 0:
+            print(" *\n * Outras reservas, na mesma hora/campo:\n ")
+            print(table_4)
+        
+        else:
+            print(" * \n * Não há reservas noutros campos, nas mesmas situações* ")
+
+        novo_dia = dia
+        opcao_invalida_2 = True
+        while novo_dia < hoje or novo_dia > (hoje + 7) or novo_dia == dia or opcao_invalida_2:
+            
+            novo_dia = int(input(f"\n * Indique o novo dia, entre {hoje} e {hoje + 7} -> "))
             
             if novo_dia == reserva_a_alterar['r_horario'].day:
                 print(" * \n * ATENÇÃO -> Dia igual ao anterior! * ")
-    
+            
+            elif novo_dia > hoje + 7 or novo_dia < hoje:
+                print(" * \n * ATENÇÃO -> Apenas pode mudar até 7 dias! *")
+            
+            elif novo_dia in outros_dias:
+                print(" * \n * ATENÇÃO -> Campo já reservado! * ")
+            
+            else:
+                opcao_invalida_2 = False
+                
+        novo_horario = reserva_a_alterar['r_horario'].replace(day = novo_dia)
+        # atualizar a reserva selecionada
+        atualizar_reserva_dia = """
+            UPDATE reserva
+            SET horario = %s,
+                estado = 'Alterado Reservado'
+            WHERE id_reserva = %s
+        """
+        cursor.execute(atualizar_reserva_dia, (novo_horario, reserva_a_alterar['id_reserva']))
+        connection.commit()
+
+        print(" * Dia atualizado!")
+        input(" * \n * Regressar - Enter")
+
     # alterar hora
     elif opcao_alterar == 3:
         nova_hora = reserva_a_alterar['r_horario'].strftime("%Hh%M")
+
         horarios_semana = ["15h00", "16h30", "18h00", "19h30", "21h00", "22h30"]
-        
-        for i in range(1, 7):
-            print(f" * {i}. {horarios_semana[i - 1]}")
-        
-        while nova_hora not in horarios_semana:
-            opcao_hora = input(" * Indique a nova hora: ")
-            nova_hora = horarios_semana[opcao_hora - 1]
+        horarios_fds = ["10h00", "11h30", "13h00", "14h30", "16h00", "17h30", "19h00", "20h30"]
 
-            if nova_hora not in horarios_semana:
+        horario = []
+        if reserva_a_alterar['r_horario'].isoweekday() >= 6:
+            horario = horarios_fds
+        else:
+            horario = horarios_semana
+
+        table_5 = PrettyTable()
+        table_5.field_names = ["#", "Horário", "Estado", "Cliente"]
+
+        i = 1
+        escolher_horario = []
+        for horario_semana in horario:
+            reservado = False
+            for reserva_hoje in reservas_futuras_corretas:
+                if reserva_hoje['campo_id_campo'] == reserva_a_alterar['campo_id_campo'] and reserva_hoje['r_horario'].strftime("%Hh%M") == horario_semana and reserva_hoje['r_horario'].day == reserva_a_alterar['r_horario'].day:
+                    table_5.add_row([" ", horario_semana, reserva_hoje['estado'], reserva_hoje['email']])
+                    reservado = True
+                    break
+            if not reservado:
+                table_5.add_row([i, horario_semana, "Livre", " "])
+                escolher_horario.append(horario_semana)
+                i += 1
+
+        print(" *\n * Horários disponíveis, no mesmo campo/dia *\n ")
+        print(table_5, "\n")
+
+        opcao_invalida_3 = True
+        while opcao_invalida_3:
+            opcao_hora = int(input(" * Indique a nova hora: "))
+
+            nova_hora = escolher_horario[opcao_hora - 1]
+
+            if nova_hora not in horario:
                 print(" * \n * ATENÇÃO -> Hora inválida! * ")
+            
+            elif nova_hora == reserva_a_alterar['r_horario'].strftime("%Hh%M"):
+                print(" * \n * ATENÇÃO -> Hora igual ao anterior! * ")
+            
+            else:
+                opcao_invalida_3 = False
 
-    # alterar estado
-    elif opcao_alterar == 4:
-        novo_estado = reserva_a_alterar['estado']
-        estados = ["Reservado", "Cancelado", "Finalizado", "Em Espera", "Em Espera Cancelado", "Alterado Reservado", "Alterado Finalizado"]
+        novo_horario = reserva_a_alterar['r_horario'].replace(hour = int(nova_hora[:2]), minute = int(nova_hora[3:5]))
+        # atualizar a reserva selecionada
+        atualizar_reserva_hora = """
+            UPDATE reserva
+            SET horario = %s,
+                estado = 'Alterado Reservado'
+            WHERE id_reserva = %s
+        """
+        cursor.execute(atualizar_reserva_hora, (novo_horario, reserva_a_alterar['id_reserva']))
+        connection.commit()
 
-        for i in range(1, 7):
-            print(f" * {i}. {estados[i - 1]}")
-        
-        while novo_estado not in estados or novo_estado == reserva_a_alterar['estado']:
-            opcao_estado = input(" * Indique o novo estado: ")
-            novo_estado = estados[opcao_estado - 1]
+        print(" * Hora atualizada!")
+        input(" * \n * Regressar - Enter")
 
-            if novo_estado == reserva_a_alterar['estado']:
-                print(" * \n * ATENÇÃO -> Estado igual ao anterior! * ")
-    
-    # atualizar a reserva selecionada
-    atualizar_reserva = """
-        UPDATE reserva
-        SET %s = %s,
-        WHERE 
-    """
+
 # ------------------------------------
 def menu_cliente(connection, utilizador):
 
@@ -926,30 +1063,27 @@ def efetuar_reserva(connection, utilizador):
 
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
-    # update das datas das reservas para teste!
-    #custom_date = datetime(year = 2024, month = 4, day = 16)
-    #update_query = f"UPDATE reserva SET horario = '{custom_date.strftime('%Y-%m-%d')}'"
-    #cursor.execute(update_query)
-    #connection.commit()
+    date = datetime(year = 2024, month = 4, day = 16, hour = 0, minute = 0, second = 0)
+    date_amanha = date + timedelta(days = 1)
+    # substituir no execute
+    # date = datetime.now(hour = 0, minute = 0, second = 0)
 
-    date = datetime(year = 2024, month = 4, day = 16) # colocando a hora também conta para o ">="
+    # ir buscar reservas do dia de hoje
     fetch_reservas_hoje = """
         SELECT *
         FROM reserva
-        WHERE horario >= %s AND (estado = 'Reservado' OR estado = 'Em Espera')
+        WHERE horario >= %s AND horario < %s AND (estado = 'Reservado' OR estado = 'Em Espera')
         ORDER BY campo_id_campo, horario, estado DESC
     """
 
     # executar querys
-    cursor.execute(fetch_reservas_hoje, (date,))
+    cursor.execute(fetch_reservas_hoje, (date, date_amanha))
     reservas_hoje = cursor.fetchall()
     
     os.system('cls')
     print(" ***** Reserva de campo no Padel Mondego *****\n *")
     #print(" * Campos Disponíveis para hoje,", datetime.now().strftime("%d/%m"))
     print(" * Campos para hoje, 16/04, HORAS (SÓ MOSTRAR A PARTIR DA HORA ATUAL)") # teste
-    
-    print(" * São as horas que estiverem na atualização! (15h00 = nenhum atualiza)")
     
     fetch_precos = "SELECT * FROM price WHERE ativo = True"
     cursor.execute(fetch_precos)
@@ -958,45 +1092,31 @@ def efetuar_reserva(connection, utilizador):
     for preco in precos:
         print(f" * * {preco['tipo_dia']}, {preco['horario']} | {preco['preco_atual']} €")
 
-    hora_atual = datetime(year = 2024, month = 4, day = 16, hour = 15, minute = 00, second = 00)
 
     # listar todos os campos e todos os horários
     # estados: reservado; cancelado; finalizado; em espera; em espera cancelado; alterado reservado; alterado finalizado
 
-    # ALTERAR ESTE ARRAY!! ESSA É A SOLUÇÃO!
+    # ALTERAR ESTE ARRAY! ESSA É A SOLUÇÃO!
     horarios_semana = ["15h00", "16h30", "18h00", "19h30", "21h00", "22h30"]
-    horarios_fds = ["10h", "11h30", "13h", "14h30", "16h", "17h30", "19h", "20h30"]
+    horarios_fds = ["10h00", "11h30", "13h00", "14h30", "16h00", "17h30", "19h00", "20h30"]
 
-    """
-    table = PrettyTable()
-    table.field_names = ["#", "Timetable 1", "State", "# 2", "Timetable 2", "State 2", "# 3", "Timetable 3", "State 3"]
-    j = 1
-    for horario_semana in horarios_semana:
-        campo_data = []
-        for campo_id in range(1, 4):
-            reservado = False
-            for reserva_hoje in reservas_hoje:
-                if (reserva_hoje['campo_id_campo'] == campo_id and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana):
-                    if reserva_hoje['estado'] == 'Reservado':
-                        campo_data.extend([f"{j}", horario_semana, "Reservado"])
-                        reservado = True
-                        break
+    hora_atual = datetime(year = 2024, month = 4, day = 16, hour = 12, minute = 00, second = 12)
+    # hora_atual = datetime.now()
 
-            if not reservado:
-                campo_data.extend([f"{j}", horario_semana, "Livre"])
-            j += 1
-        table.add_row(campo_data)
-        
-        if len(campo_data) == 6:
-            table.add_row(campo_data)
+    horario = []
+    # verificar se é fim de semana
+    if hora_atual.isoweekday() >= 6:
+        horario = horarios_fds
+    else:
+        horario = horarios_semana
 
-    print(table)
-    """
+    # mostrar slots a partir da hora atual
+    horario = [horario[i] for i in range(len(horario)) if hora_atual.hour < int(horario[i][:2]) or (hora_atual.hour == int(horario[i][:2]) and hora_atual.minute <= int(horario[i][3:]))]
 
     print(" * \n * Campo - 1 * \n * ")
     i = 1
     count_slots_mostrados = 0
-    for horario_semana in horarios_semana:
+    for horario_semana in horario:
         reservado = False
         # tecnicamente não será necessário este "if" (só apareceram a partir da hora atual)
         #if hora_atual.hour < int(horario_semana[:2]) or (hora_atual.hour == int(horario_semana[:2]) and hora_atual.minute <= int(horario_semana[3:])):
@@ -1012,7 +1132,7 @@ def efetuar_reserva(connection, utilizador):
         count_slots_mostrados += 1
 
     print(" * \n * Campo - 2 * \n * ")
-    for horario_semana in horarios_semana:
+    for horario_semana in horario:
         reservado = False
         for reserva_hoje in reservas_hoje:
             if reserva_hoje['campo_id_campo'] == 2 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
@@ -1025,7 +1145,7 @@ def efetuar_reserva(connection, utilizador):
         i += 1
 
     print(" * \n * Campo - 3 * \n * ")
-    for horario_semana in horarios_semana:
+    for horario_semana in horario:
         reservado = False
         for reserva_hoje in reservas_hoje:
             if reserva_hoje['campo_id_campo'] == 3 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
@@ -1050,17 +1170,17 @@ def efetuar_reserva(connection, utilizador):
         campo_escolhido = 0
         # campo 1
         if opcao <= count_slots_mostrados:
-            hora_escolhida = horarios_semana[opcao - 1]
+            hora_escolhida = horario[opcao - 1]
             campo_escolhido = 1
         
         # campo 2
         elif opcao > count_slots_mostrados and opcao <= 2 * count_slots_mostrados:
-            hora_escolhida = horarios_semana[opcao - 7]
+            hora_escolhida = horario[opcao - (count_slots_mostrados - 1)]
             campo_escolhido = 2
 
         # campo 3
         elif opcao > 2 * count_slots_mostrados and opcao <= 3 * count_slots_mostrados:
-            hora_escolhida = horarios_semana[opcao - 13]
+            hora_escolhida = horario[opcao - (count_slots_mostrados * 2 - 1)]
             campo_escolhido = 3
         
         # outro dia
@@ -1579,7 +1699,7 @@ def atualiza_campos(connection):
     # recebe hora atual
     # current_datetime = datetime.now()
 
-    current_datetime = datetime(year = 2024, month = 4, day = 16, hour = 14, minute = 00, second = 00)
+    current_datetime = datetime(year = 2024, month = 4, day = 16, hour = 12, minute = 00, second = 00)
     diferenca = current_datetime - timedelta(hours = 1, minutes = 30)
 
     # dar update das reservas em que já passou 1h30
@@ -1590,8 +1710,14 @@ def atualiza_campos(connection):
         SET estado = 'Finalizado'
         WHERE estado = 'Reservado' AND horario < %s
     """
+    update_jogos_a_decorrer_alterados = """
+        UPDATE reserva
+        SET estado = 'Alterado Finalizado'
+        WHERE estado = 'Alterado Reservado' AND horario < %s
+    """
 
     cursor.execute(update_jogos_a_decorrer, (diferenca,))
+    cursor.execute(update_jogos_a_decorrer_alterados, (diferenca,))
     connection.commit()
 
     if cursor.rowcount > 0:
