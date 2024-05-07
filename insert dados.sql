@@ -1,5 +1,5 @@
 -- assim
-crypt('password1', gen_salt('bf', 8));
+--crypt('password1', gen_salt('bf', 8));
 
 -- tabela utilizador
 INSERT INTO utilizador (email, passe, nome) VALUES
@@ -59,9 +59,10 @@ INSERT INTO reserva (id_reserva, horario, estado, price_id_custo, campo_id_campo
 (8, '2024-04-04 10:00:00', 'Alterado Finalizado', 4, 2, 'luis@gmail.com');
 
 -- tabela mensagem
-INSERT INTO mensagem (id_mensagem, assunto, conteudo, data_envio, administrador_utilizador_email) VALUES
-(1, 'Promoção de Verão', 'Não percam as nossas promoções de verão!', '2024-04-08', 'admin'),
-(2, 'Aviso de manutenção', 'O campo 2 estará fechado para manutenção na próxima semana!', '2024-04-09', 'admin1');
+INSERT INTO mensagem (id_mensagem, assunto, conteudo, data_envio, geral, administrador_utilizador_email) VALUES
+(1, 'Promoção de Verão', 'Não percam as nossas promoções de verão!', '2024-04-08', FALSE, 'admin'),
+(2, 'Aviso de manutenção', 'O campo 2 estará fechado para manutenção na próxima semana!', '2024-04-09', FALSE, 'admin1'),
+(3, 'Aviso de chuva', 'O campo 2 estará molhado!', '2024-04-09', FALSE, 'admin1');
 
 -- tabela mensagem_cliente
 INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_email) VALUES

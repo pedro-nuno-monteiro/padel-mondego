@@ -68,7 +68,7 @@ def main():
 def menu_admin(connection, utilizador, tipo_user):
     
     opcao = 1 
-    while opcao > 0 or opcao < 7:
+    while opcao > 0 or opcao < 8:
         opcao = apresentar_menu_admin(tipo_user, utilizador)
 
         if opcao == 1:
@@ -81,21 +81,73 @@ def menu_admin(connection, utilizador, tipo_user):
             estatisticas(connection)
             
         elif opcao == 4:
-            print("mensagem geral")
+            # o tipo user vai 'Admin' ou 'Super Admin'
+            mensagens_admin(connection, utilizador, tipo_user)
         
         elif opcao == 5:
-            print("mensagem privada")
+            descricao_campos(connection)
 
-        elif opcao == 6 and tipo_user == 'Admin':
+        elif opcao == 6:
+            editar_perfil(connection)
+
+        elif opcao == 7 and tipo_user == 'Admin':
             os.system('cls')
             return None
 
-        elif opcao == 6 and tipo_user == 'Super Admin':
+        elif opcao == 8 and tipo_user == 'Super Admin':
             gestao_admins(connection)
             
-        elif opcao == 7 and tipo_user == 'Super Admin':
+        elif opcao == 6 and tipo_user == 'Super Admin':
             os.system('cls')
             return None
+
+# ------------------------------------
+def descricao_campos(connection):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    fetch_campos = """
+        SELECT *
+        FROM campo
+    """
+    cursor.execute(fetch_campos)
+    campos = cursor.fetchall()
+
+    os.system('cls')
+    print(" ***** Descrição dos Campos *****\n *")
+    table = PrettyTable()
+    table.field_names = ["#", "Nome", "Descrição"]
+    
+    i = 1
+    for campo in campos:
+        table.add_row([i, campo['id_campo'], campo['descricao']])
+        i += 1
+
+    print(table)
+    print(" \n *", i + 1, "Regressar")
+
+    opcao = 0
+    while opcao < 1 or opcao > i + 1:
+        opcao = int(input(" * \n * Escolha um campo -> "))
+
+        if opcao == i + 1:
+            break
+
+        elif opcao > 0 and opcao <= i:
+            campo = campos[opcao - 1]
+
+            nova_descricao = input(" \n * Nova Descrição ->")
+
+            alterar_descricao = """
+                UPDATE campo
+                SET descricao = %s
+                WHERE id_campo = %s
+            """
+            cursor.execute(alterar_descricao, (nova_descricao, campo['id_campo'],))
+            connection.commit()
+
+            print(" * Descrição alterada com sucesso!")
+            input(" * \n * Regressar - Enter")
 
 # ------------------------------------
 def gestao_admins(connection):
@@ -150,14 +202,14 @@ def adicionar_admin(connection):
     cursor.execute(fetch_admins)
     admins = cursor.fetchall()
 
-    table = PrettyTable()
     table_admins = PrettyTable()
-    table.field_names = ["#", "Nome", "Email"]
-    table_admins.field_names = ["#", "Nome", "Email"]
-    for j , admin in enumerate(admins, start = 1):
-        table_admins.add_row([j, admin['nome'], admin['email']])
+    table_admins.field_names = ["Nome", "Email"]
+    for admin in admins:
+        table_admins.add_row([admin['nome'], admin['email']])
 
     i = 1
+    table = PrettyTable()
+    table.field_names = ["#", "Nome", "Email"]
     cliente_valido = []
     for cliente in clientes:
         if cliente['email'] not in [admin['email'] for admin in admins]:
@@ -428,8 +480,267 @@ def estatisticas(connection):
             input(" \n * Regressar - Enter")
         
         elif opcao == 6:
-            print("Receber notificação")
+            tipo_menu = " ***** Receber notificação *****\n *"
+            data_inicial, data_final = menu_periodo(tipo_menu)
+
+            fetch_reservas_em_espera = """
+                SELECT *
+                FROM reserva
+                WHERE horario >= %s AND horario <= %s AND estado = 'Em Espera'
+                ORDER BY horario
+            """
+            cursor.execute(fetch_reservas_em_espera, (data_inicial, data_final))
+            reservas_em_espera = cursor.fetchall()
+
+            os.system('cls')
+            print(" ***** Reservas em espera *****\n *")
+
+            table = PrettyTable()
+            table.field_names = ["Email Cliente", "Horário", "Campo"]
+            for reserva in reservas_em_espera:
+                table.add_row([reserva['cliente_utilizador_email'], reserva['horario'].strftime("%d/%m, %Hh%M"), reserva['campo_id_campo']])
+            
+            print(table)
             input(" \n * Regressar - Enter")
+
+# ------------------------------------
+def mensagens_admin(connection, utilizador, tipo_user):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    opcao = 1
+    while opcao > 0 and opcao < 3:
+        os.system('cls')
+        print(" ***** Mensagens *****\n *")
+        print(" * 1. Enviar mensagem")
+        print(" * 2. Histórico")
+        print(" * 3. Regressar")
+    
+        opcao = int(input(" * \n * Escolha uma opção -> "))
+
+        if opcao == 3:
+            break
+
+        elif opcao == 1:
+            voltar = enviar_mensagem(connection, utilizador)
+            if not voltar:
+                opcao = 0
+
+        elif opcao == 2:
+            historico_mensagens(connection, utilizador, tipo_user)
+
+# ------------------------------------
+def historico_mensagens(connection, utilizador, tipo_user):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    if tipo_user == 'Super Admin':
+        fetch_mensagens = """
+            SELECT *
+            FROM mensagem
+            ORDER BY administrador_utilizador_email, data_envio
+        """
+        cursor.execute(fetch_mensagens)
+        mensagens = cursor.fetchall()
+
+    elif tipo_user == 'Admin':
+        fetch_mensagens = """
+            SELECT *
+            FROM mensagem
+            WHERE administrador_utilizador_email = %s
+        """
+        cursor.execute(fetch_mensagens, (utilizador['email'],))
+        mensagens = cursor.fetchall()
+    
+    else:
+        print("erro")
+        input(" ")
+
+    os.system('cls')
+    print(" ***** Histórico de Mensagens *****\n ")
+
+    if tipo_user == 'Admin':
+        table = PrettyTable()
+        table.field_names = ["#", "Assunto", "Data Envio", "Geral"]
+        
+        for i, mensagem in enumerate(mensagens, start = 1):
+            if mensagem['geral']:
+                table.add_row([i, mensagem['assunto'], mensagem['data_envio'].strftime("%d/%m"), "Sim"])
+            else:    
+                table.add_row([i, mensagem['assunto'], mensagem['data_envio'].strftime("%d/%m"), "Não"])
+        
+        print(table)
+        print(" \n *", i + 1, "Regressar\n *")
+
+        opcao = 0
+        while opcao < 1 or opcao > i + 1:
+            opcao = int(input(" * \n * Escolha uma mensagem -> "))
+
+            if opcao == i + 1:
+                break
+
+            elif opcao > 0 and opcao <= i:
+                mensagem = mensagens[opcao - 1]
+
+                os.system('cls')
+                print(" ***** Mensagem *****\n *")
+                print(" * Assunto: ", mensagem['assunto'])
+                print(" * Data Envio: ", mensagem['data_envio'].strftime("%d/%m"))
+                print(" * Conteúdo: ", mensagem['conteudo'])
+
+                input(" * \n * Regressar - Enter")
+    else:
+        table = PrettyTable()
+        table.field_names = ["#", "Remetente",  "Assunto", "Data Envio", "Geral"]
+        for i, mensagem in enumerate(mensagens, start = 1):
+            if mensagem['geral']:
+                table.add_row([i, mensagem['administrador_utilizador_email'], mensagem['assunto'], mensagem['data_envio'].strftime("%d/%m"), "Sim"])
+            else:
+                table.add_row([i, mensagem['administrador_utilizador_email'], mensagem['assunto'], mensagem['data_envio'].strftime("%d/%m"), "Não"])
+        
+        print(table)
+        print(" \n *", i + 1, "Regressar\n *")
+
+        opcao = 0
+        while opcao < 1 or opcao > i + 1:
+            opcao = int(input(" * \n * Escolha uma mensagem -> "))
+
+            if opcao == i + 1:
+                break
+
+            elif opcao > 0 and opcao <= i:
+                mensagem = mensagens[opcao - 1]
+
+                os.system('cls')
+                print(" ***** Mensagem *****\n *")
+                print(" * Remetente: ", mensagem['administrador_utilizador_email'])
+                print(" * Assunto: ", mensagem['assunto'])
+                print(" * Data Envio: ", mensagem['data_envio'].strftime("%d/%m"))
+                print(" * Conteúdo: ", mensagem['conteudo'])
+
+                input(" * \n * Regressar - Enter")
+
+# ------------------------------------
+def enviar_mensagem(connection, utilizador):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    fetch_mensagens = """
+        SELECT max(id_mensagem) as id_mensagem
+        FROM mensagem
+    """
+    cursor.execute(fetch_mensagens)
+    id_mensagem, = cursor.fetchone()
+
+    os.system('cls')
+    print(" ***** Enviar Mensagem *****\n *")
+
+    print(" * 1. Geral")
+    print(" * 2. Cliente")
+    print(" * 3. Regressar")
+
+    opcao_mensagem = 0
+    while opcao_mensagem < 1 or opcao_mensagem > 3:
+        opcao_mensagem = int(input(" * \n * Escolha uma opção -> "))
+
+        if opcao_mensagem == 1 or opcao_mensagem == 2:
+            break
+
+        elif opcao_mensagem == 3:
+            return True
+
+        else:
+            print(" * \n * Opção inválida! * ")
+
+    assunto = input(" \n * Assunto -> ")
+    conteudo = input(" \n * Mensagem -> ")
+
+    mensagem = []
+    id_correto = id_mensagem + 1
+    mensagem.append(id_correto)
+    mensagem.append(assunto)
+    mensagem.append(conteudo)
+
+    data_hora = datetime.now().date()
+
+    mensagem.append(data_hora)
+
+    if opcao_mensagem == 1:
+        mensagem.append(True)
+
+    elif opcao_mensagem == 2:
+        mensagem.append(False)
+
+    mensagem.append(utilizador['email'])
+
+    inserir_mensagem = """
+        INSERT INTO mensagem (id_mensagem, assunto, conteudo, data_envio, geral, administrador_utilizador_email)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """
+    cursor.execute(inserir_mensagem, mensagem)
+    connection.commit()
+
+    fetch_clientes = """
+        SELECT email, utilizador_email, nome
+        FROM cliente, utilizador
+        WHERE utilizador_email = email
+    """
+    cursor.execute(fetch_clientes)
+    clientes = cursor.fetchall()
+
+    # adicionar à tabela as mensagens GERAIS
+    if opcao_mensagem == 1:
+
+        for cliente in clientes:
+            mensagem_cliente = []
+            mensagem_cliente.append(False)
+            mensagem_cliente.append(id_correto)
+            mensagem_cliente.append(cliente['email'])
+
+            inserir_mensagem_cliente = """
+                INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_email)
+                VALUES (%s, %s, %s)
+            """
+            cursor.execute(inserir_mensagem_cliente, (mensagem_cliente))
+            connection.commit()
+
+    elif opcao_mensagem == 2:
+
+        print(" \n * Escolha o cliente\n")
+        table = PrettyTable()
+        table.field_names = ["#", "Nome", "Email"]
+        for i, cliente in enumerate(clientes, start = 1):
+            table.add_row([i, cliente['nome'], cliente['email']])
+        
+        print(table)
+
+        opcao_cliente = 0
+        while opcao_cliente < 1 or opcao_cliente > len(clientes):
+            opcao_cliente = int(input(" \n * Escolha um cliente -> "))
+
+            if opcao_cliente > 0 and opcao_cliente <= len(clientes):
+                break
+
+            else:
+                print(" * \n * Opção inválida! * ")
+
+        mensagem_cliente = []
+        mensagem_cliente.append(False)
+        mensagem_cliente.append(id_correto)
+
+        email_cliente = clientes[opcao_cliente - 1]['email']
+        mensagem_cliente.append(email_cliente)
+
+        inserir_mensagem_cliente = """
+            INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_email)
+            VALUES (%s, %s, %s)
+        """
+        cursor.execute(inserir_mensagem_cliente, (mensagem_cliente))
+        connection.commit()
+        
+    print(" * Mensagem enviada com sucesso!")
+    input(" * \n * Regressar - Enter")
+    return False
 
 # ------------------------------------
 def menu_periodo(tipo_menu):
@@ -931,11 +1242,13 @@ def alterar_reservas(connection, reserva_a_alterar, reservas_futuras_corretas):
 def menu_cliente(connection, utilizador):
 
     opcao = 1
-    while opcao > 0 or opcao < 5:
+    while opcao > 0 or opcao < 6:
         opcao = apresentar_menu_cliente(utilizador)
 
         if opcao == 1:
             voltar = informacoes_e_perfil(connection, utilizador)
+            
+            # ver se dá para implementar isto algures
             if voltar:
                 opcao = 0
 
@@ -949,8 +1262,149 @@ def menu_cliente(connection, utilizador):
             historico_reservas(connection, utilizador)
 
         elif opcao == 5:
+            mensagens_cliente(connection, utilizador)
+
+        elif opcao == 6:
             os.system('cls')
             return None
+
+# ------------------------------------
+def mensagens_cliente(connection, utilizador):
+    
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    regressar = False
+    while not regressar:
+
+        fetch_mensagens = """
+            SELECT *
+            FROM mensagem, mensagem_cliente
+            WHERE id_mensagem = mensagem_id_mensagem AND cliente_utilizador_email = %s
+            ORDER BY lida, mensagem_id_mensagem
+        """
+        cursor.execute(fetch_mensagens, (utilizador['email'],))
+        mensagens = cursor.fetchall()
+
+        fetch_admin = """
+            SELECT nome
+            FROM administrador, utilizador
+            WHERE utilizador_email = email
+        """
+        cursor.execute(fetch_admin)
+        nome_admin, = cursor.fetchone()
+
+        count_lidas = 0
+        count_gerais = 0
+        count_privadas = 0
+        count_notificacoes = 0
+        for mensagem in mensagens:
+            if not mensagem['lida']:
+                count_lidas += 1
+            elif mensagem['geral']:
+                count_gerais += 1
+            elif not mensagem['geral']:
+                count_privadas += 1
+            elif mensagem['assunto'] == "Campo Disponível!":
+                count_notificacoes += 1
+            else:
+                print("Erro")
+                input(" ")
+
+        os.system('cls')
+        print(" ***** Mensagens ***** \n *")
+
+        i = 1
+        mensagens_nao_lidas = []
+        if count_lidas > 0:
+            print(" * Não lidas *\n *")
+            for mensagem in mensagens:
+                if not mensagem['lida']:
+                    print(f" * {i}. {mensagem['assunto']}, enviada a {mensagem['data_envio'].strftime('%d/%m')}")
+                    i += 1
+                    mensagens_nao_lidas.append(mensagem)
+        else:
+            print(" *\n * Não tem mensagens por ler *\n *")
+
+        mensagens_gerais = []
+        if count_gerais > 0:
+            print(" *\n *\n * Mensagens do clube *\n *")
+            for mensagem in mensagens:
+                if mensagem['geral'] and mensagem['lida']:
+                    print(f" * {i}. {mensagem['assunto']}, enviada a {mensagem['data_envio'].strftime('%d/%m')}")
+                    i += 1
+                    mensagens_gerais.append(mensagem)
+        else:
+            print(" *\n *\n * Não tem mensagens do clube *\n *")
+
+        mensagens_privadas = []
+        if count_privadas > 0:
+            print(" *\n *\n * Mensagens do administrador *\n *")
+            for mensagem in mensagens:
+                if not mensagem['geral'] and mensagem['lida']:
+                    print(f" * {i}. {mensagem['assunto']}, enviada a {mensagem['data_envio'].strftime('%d/%m')}, por {nome_admin}")
+                    i += 1
+                    mensagens_privadas.append(mensagem)
+        else:
+            print(" *\n *\n * Não tem mensagens do administrador *\n *")
+
+        notificacoes = []
+        if count_notificacoes > 0:
+            print(" *\n *\n * Notificações de Campo *\n *")
+            for mensagem in mensagens:
+                if mensagem['assunto'] == "Campo Disponível!":
+                    print(f" * {i}. {mensagem['conteudo']}, enviada a {mensagem['data_envio'].strftime('%d/%m')}")
+                    i += 1
+                    notificacoes.append(mensagem)
+        else:
+            print(" *\n *\n * Não tem notificações de campo *\n *")
+
+        print(" *", i, " - Regressar\n *")
+
+        opcao = 0
+        regressar = False
+        while opcao < 1 or opcao > i:
+            opcao = int(input(" * Escolha uma mensagem -> "))
+
+            if opcao > 0 and opcao < i:
+                if opcao <= count_lidas:
+                    mensagem_escolhida = mensagens_nao_lidas[opcao - 1]
+
+                elif opcao <= count_lidas + count_gerais:
+                    mensagem_escolhida = mensagens_gerais[opcao - count_lidas - 1]
+
+                elif opcao <= count_lidas + count_gerais + count_privadas:
+                    mensagem_escolhida = mensagens_privadas[opcao - count_lidas - count_gerais - 1]
+
+                elif opcao <= count_lidas + count_gerais + count_privadas + count_notificacoes:
+                    mensagem_escolhida = notificacoes[opcao - count_lidas - count_gerais - count_privadas - 1]
+
+            elif opcao == i:
+                regressar = True
+                break
+
+            else:
+                print(" * \n * Opção inválida! * ")
+
+        if not regressar:
+            os.system('cls')
+            print(" ***** Mensagem *****\n *")
+            print(" * De:", nome_admin, ", a", mensagem_escolhida['data_envio'].strftime("%d/%m/%Y"))
+            print(" * Assunto:", mensagem_escolhida['assunto'])
+            print(" * Mensagem:", mensagem_escolhida['conteudo'])
+
+            if mensagem_escolhida['assunto'] == 'Campo Disponível!':
+                print(" *\n * Para aceitar a reserva, diriga-se ao menu das suas reservas!")
+
+            if mensagem_escolhida['lida'] == False:
+                marcar_lida = """
+                    UPDATE mensagem_cliente
+                    SET lida = True
+                    WHERE mensagem_id_mensagem = %s AND cliente_utilizador_email = %s
+                """
+                cursor.execute(marcar_lida, (mensagem_escolhida['mensagem_id_mensagem'], utilizador['email']))
+                connection.commit()
+
+            input(" * \n * Regressar - Enter")
 
 # ------------------------------------
 def informacoes_e_perfil(connection, utilizador):
@@ -1332,51 +1786,95 @@ def reservas_atuais(connection, utilizador):
 
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
+    # hora teste
+    horario_atual = datetime(year = 2024, month = 4, day = 16, hour = 12, minute = 00, second = 00)
+
     # mostra reservas futuras
     fetch_reservas_user = """
         SELECT *
         FROM reserva
-        WHERE cliente_utilizador_email = %s
+        WHERE cliente_utilizador_email = %s AND horario >= %s
         ORDER BY estado DESC, campo_id_campo, horario
     """
 
-    cursor.execute(fetch_reservas_user, (utilizador['email'],))
+    cursor.execute(fetch_reservas_user, (utilizador['email'], horario_atual))
     reservas_futuras = cursor.fetchall()
+
+    fetch_reservas_canceladas = """
+        SELECT *
+        FROM reserva
+        WHERE horario >= %s AND cliente_utilizador_email != %s AND estado = 'Cancelado'
+    """
+    cursor.execute(fetch_reservas_canceladas, (horario_atual, utilizador['email']))
+    reservas_canceladas = cursor.fetchall()
 
     os.system('cls')
     print(" ***** Reservas Futuras - Padel Mondego *****\n *")
     print(" * Neste menu é possível:")
     print(" * * Consultar as reservas atuais")
-    print(" * * Cancelar uma reserva (escolher)")
+    print(" * * Cancelar uma reserva")
     print(" * * Consultar reservas em espera\n ")
     
     i = 1
     table = PrettyTable()
-    table.field_names = ["#", "Campo", "Data", "Horário", "Preço", "Estado"]
+    table.field_names = ["#", "Campo", "Data", "Horário", "Preço", "Estado", "Not"]
 
     reservas_a_alterar = []
+    reservas_em_espera = []
+    apresentar_notificacao = " "
+    continuar = False
     for reserva_futura in reservas_futuras:
         
-        buscar_preco = """
-            SELECT preco_atual
-            FROM price 
-            WHERE id_custo = %s
-        """
+        buscar_preco = "SELECT preco_atual FROM price WHERE id_custo = %s"
         cursor.execute(buscar_preco, (reserva_futura['price_id_custo'],))
         preco = cursor.fetchone()[0]
         apresentar_preco = f"{preco} €"
         apresentar_i = f"{i}."
-        if reserva_futura['estado'] == "Reservado" or reserva_futura['estado'] == "Em Espera":
+        apresentar_notificacao = " "
+
+        if reserva_futura['estado'] == "Reservado" or reserva_futura['estado'] == "Alterado Reservado":
             table.add_row([apresentar_i, reserva_futura['campo_id_campo'], reserva_futura['horario'].strftime("%d/%m"),
-                        reserva_futura['horario'].strftime("%Hh%M"), apresentar_preco, reserva_futura['estado']])
+                        reserva_futura['horario'].strftime("%Hh%M"), apresentar_preco, reserva_futura['estado'], apresentar_notificacao])
             i += 1
             reservas_a_alterar.append(reserva_futura)
+        
+        elif reserva_futura['estado'] == 'Em Espera':
+            continuar = False
+            for res in reservas_canceladas:
+                if res['horario'] == reserva_futura['horario'] and res['campo_id_campo'] == reserva_futura['campo_id_campo']:
+                    reservas_em_espera.append(reserva_futura)
+                    continuar = True
+                    break
+
+            if not continuar:
+                table.add_row([apresentar_i, reserva_futura['campo_id_campo'], reserva_futura['horario'].strftime("%d/%m"),
+                            reserva_futura['horario'].strftime("%Hh%M"), apresentar_preco, reserva_futura['estado'], apresentar_notificacao])
+                reservas_a_alterar.append(reserva_futura)
+                i += 1
 
         else:
             table.add_row([" ", reserva_futura['campo_id_campo'], reserva_futura['horario'].strftime("%d/%m"),
-                        reserva_futura['horario'].strftime("%Hh%M"), apresentar_preco, reserva_futura['estado']])
+                        reserva_futura['horario'].strftime("%Hh%M"), apresentar_preco, reserva_futura['estado'], apresentar_notificacao])
 
+    # imprime reservas 'Em Espera'
     print(table)
+    
+    table_2 = PrettyTable()
+    table_2.field_names = ["#", "Campo", "Data", "Horário", "Preço", "Estado", "Not"]
+    for reserva in reservas_em_espera:
+        buscar_preco = "SELECT preco_atual FROM price WHERE id_custo = %s"
+        cursor.execute(buscar_preco, (reserva['price_id_custo'],))
+        preco = cursor.fetchone()[0]
+        apresentar_preco = f"{preco} €"
+        apresentar_i = f"{i}."
+        apresentar_notificacao = "!"
+
+        table_2.add_row([apresentar_i, reserva['campo_id_campo'], reserva['horario'].strftime("%d/%m"),
+                        reserva['horario'].strftime("%Hh%M"), apresentar_preco, reserva['estado'], apresentar_notificacao])
+        i += 1
+
+    if reservas_em_espera != []:
+        print(table_2)
 
     print(f"\n * {i}. Regressar")
 
@@ -1388,18 +1886,91 @@ def reservas_atuais(connection, utilizador):
             break
         
         elif opcao < i:
-            id_reserva_cancelar = reservas_a_alterar[opcao - 1]['id_reserva']
 
-            # estado fica "Cancelado"
-            cancelar_reserva = """
-                UPDATE reserva
-                SET estado = 'Cancelado'
-                WHERE id_reserva = %s
-            """
-            cursor.execute(cancelar_reserva, (id_reserva_cancelar,))
-            connection.commit()
+            if opcao <= len(reservas_a_alterar):
+                reserva_cancelar = reservas_a_alterar[opcao - 1]
 
-            print(" * Reserva cancelada com sucesso!")
+                # estado fica "Cancelado"
+                cancelar_reserva = """
+                    UPDATE reserva
+                    SET estado = 'Cancelado'
+                    WHERE id_reserva = %s
+                """
+                cursor.execute(cancelar_reserva, (reserva_cancelar['id_reserva'],))
+                connection.commit()
+
+                # verifica se havia reservas em espera para o campo e hora cancelada
+                reservas_totais = """
+                    SELECT *
+                    FROM reserva
+                    WHERE estado = 'Em Espera' AND horario >= %s
+                """
+                cursor.execute(reservas_totais, (horario_atual,))
+                reservas = cursor.fetchall()
+
+                fetch_mensagens = """
+                    SELECT max(id_mensagem)
+                    FROM mensagem
+                """
+                cursor.execute(fetch_mensagens)
+                id_correto = cursor.fetchone()[0] + 1
+
+                cliente_em_espera = []
+                for reserva in reservas:
+                    if reserva['campo_id_campo'] == reserva_cancelar['campo_id_campo'] and reserva['horario'] == reserva_cancelar['horario']:
+                        conteudo_mensagem = f"A sua reserva 'Em Espera' para o campo {reserva['campo_id_campo']}, às {reserva['horario'].strftime('%Hh%M')}, no dia {reserva['horario'].strftime('%m-%d')} acabou de ficar disponível!"
+                        cliente_em_espera.append(reserva['cliente_utilizador_email'])
+
+                if len(cliente_em_espera) > 0:
+                    envia_notificacao = """
+                        INSERT INTO mensagem (id_mensagem, assunto, conteudo, data_envio, geral, administrador_utilizador_email)
+                        VALUES (%s, 'Campo Disponível!', %s, %s, FALSE, 'sadmin')
+                    """
+                    cursor.execute(envia_notificacao, (id_correto, conteudo_mensagem, horario_atual.strftime('%Y-%m-%d'),))
+                    connection.commit()
+
+                    for cliente in cliente_em_espera:
+                        envia_notificacao_cliente = """
+                            INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_email)
+                            VALUES (FALSE, %s, %s)
+                        """
+                        cursor.execute(envia_notificacao_cliente, (id_correto, cliente))
+                        connection.commit()
+
+                print(" * Reserva cancelada com sucesso!")
+
+            elif opcao > len(reservas_a_alterar):
+                reserva_opcao = reservas_em_espera[opcao - len(reservas_a_alterar) - 1]
+
+                print(" * \n * 1. Aceitar Vaga * ")
+                print(" * 2. Cancelar * ")
+
+                opcao_reserva = 0
+                while opcao_reserva < 1 or opcao_reserva > 2:
+                    opcao_reserva = int(input(" * \n * Escolha uma opção -> "))
+
+                    if opcao_reserva == 1:
+                        aceitar_reserva = """
+                            UPDATE reserva
+                            SET estado = 'Reservado'
+                            WHERE id_reserva = %s
+                        """
+                        cursor.execute(aceitar_reserva, (reserva_opcao['id_reserva'],))
+                        connection.commit()
+                        print(" * Reserva efetuada com sucesso!")
+
+                    elif opcao_reserva == 2:
+                        cancelar_reserva = """
+                            UPDATE reserva
+                            SET estado = 'Em Espera Cancelado'
+                            WHERE id_reserva = %s
+                        """
+                        cursor.execute(cancelar_reserva, (reserva_opcao['id_reserva'],))
+                        connection.commit()
+                        print(" * Reserva cancelada com sucesso!")
+
+                    else:
+                        print(" * \n * Opção inválida! * ")
 
             input(" * \n * Regressar - Enter")
 
@@ -1587,9 +2158,9 @@ def register(connection):
     user.append(nome)
 
     # insere utilizador (antes de inserir admin ou cliente)
-    insere_user = "INSERT INTO utilizador VALUES (%s, crypt(%s, gen_salt('bf')), %s)"
-    cursor.execute(insere_user, user)
-    connection.commit()
+    #insere_user = "INSERT INTO utilizador VALUES (%s, crypt(%s, gen_salt('bf')), %s)"
+    #cursor.execute(insere_user, user)
+    #connection.commit()
 
     print(" RETIRAR ISTO DEPOIS!!! ")
     print(" * \n * \n * Tipo de utilizador\n *")
@@ -1617,13 +2188,18 @@ def register(connection):
 
         # inserir utilizador + admin
 
+        # insere utilizador (antes de inserir admin ou cliente)
+        insere_user = "INSERT INTO utilizador VALUES (%s, crypt(%s, gen_salt('bf')), %s)"
+        cursor.execute(insere_user, user)
+        connection.commit()
+
         insere_admin = "INSERT INTO administrador VALUES (%s, %s)"
         cursor.execute(insere_admin, user_admin)
         connection.commit()
 
         print(" * \n * \n * Registo efetuado com os dados acima indicados! * ")
 
-    else:
+    else:   
         user_cliente = []
 
         print(" * \n * ")
@@ -1644,6 +2220,10 @@ def register(connection):
         user_cliente.append(email)
 
         # inserir utilizador + cliente
+        # insere utilizador (antes de inserir admin ou cliente)
+        insere_user = "INSERT INTO utilizador VALUES (%s, crypt(%s, gen_salt('bf')), %s)"
+        cursor.execute(insere_user, user)
+        connection.commit()
 
         insere_admin = "INSERT INTO cliente VALUES (%s, %s, %s)"
         cursor.execute(insere_admin, user_cliente)
@@ -1665,17 +2245,18 @@ def apresentar_menu_admin(tipo_user, utilizador):
     print(" * 1 - Alterar Reservas")
     print(" * 2 - Alterar Preços")
     print(" * 3 - Estatísticas")
-    print(" * 4 - Mensagem Geral")
-    print(" * 5 - Mensagem Privada")
+    print(" * 4 - Mensagem")
+    print(" * 5 - Descrição Campos")
+    print(" * 6 - Editar Perfil*")
     
     if tipo_user == 'Admin':
-        print(" * 6 - Logout | Sair\n *")
-    else:
-        print(" * 6 - Gestão de Admins")
         print(" * 7 - Logout | Sair\n *")
+    else:
+        print(" * 7 - Gestão de Admins")
+        print(" * 8 - Logout | Sair\n *")
 
     opcao = 0
-    while opcao < 1 or (opcao > 6 and tipo_user == 'Admin') or (opcao > 7 and tipo_user == 'Super Admin'):
+    while opcao < 1 or (opcao > 5 and tipo_user == 'Admin') or (opcao > 6 and tipo_user == 'Super Admin'):
         opcao = int(input(" * Escolha uma opção -> "))
 
     return opcao
@@ -1688,10 +2269,11 @@ def apresentar_menu_cliente(utilizador):
     print(" * 2 - Reservar Campo")
     print(" * 3 - Reservas atuais")
     print(" * 4 - Histórico de Reservas")
-    print(" * 5 - Logout | Sair\n *")
+    print(" * 5 - Mensagens")
+    print(" * 6 - Logout | Sair\n *")
 
     opcao = 0
-    while opcao < 1 or opcao > 5:
+    while opcao < 1 or opcao > 6:
         opcao = int(input(" * Escolha uma opção -> "))
 
     return opcao

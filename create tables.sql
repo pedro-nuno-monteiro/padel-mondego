@@ -22,6 +22,7 @@ CREATE TABLE mensagem (
 	assunto			 TEXT,
 	conteudo			 TEXT,
 	data_envio			 DATE,
+	geral				 BOOL,
 	administrador_utilizador_email VARCHAR(512) NOT NULL,
 	PRIMARY KEY(id_mensagem)
 );
