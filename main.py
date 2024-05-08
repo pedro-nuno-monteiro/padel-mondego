@@ -1,6 +1,7 @@
 import psycopg2
 import psycopg2.extras
 import os
+import re
 import time
 from datetime import datetime, timedelta, date
 from prettytable import PrettyTable
@@ -48,14 +49,19 @@ def main():
                 print(" * 1. Cliente")
                 print(" * 2. Administrador")
 
-                opcao_menu = 0
-                while opcao_menu < 1 or opcao_menu > 2:
-                    opcao_menu = int(input(" * \n * Escolha uma opção -> "))
-
-                    if opcao_menu == 1:
-                        tipo_user = "Cliente"
-                    elif opcao_menu == 2:
-                        tipo_user = "Admin"
+                while True:
+                    opcao_menu = input(" * Escolha uma opção -> ").strip()
+                    
+                    if opcao_menu.isdigit():
+                        opcao_menu = int(opcao_menu)
+                        
+                        if opcao_menu == 1:
+                            tipo_user = "Cliente"
+                            break
+                        elif opcao_menu == 2:
+                            tipo_user = "Admin"
+                            break
+                    print(" * \n *** ATENÇÃO -> Opção inválida! ***")
 
             if tipo_user == 'Admin' or tipo_user == 'Super Admin':
                 menu_admin(connection, utilizador, tipo_user)
@@ -88,18 +94,83 @@ def menu_admin(connection, utilizador, tipo_user):
             descricao_campos(connection)
 
         elif opcao == 6:
-            editar_perfil(connection)
+            utilizador_novo = editar_perfil(connection, utilizador)
+            utilizador = utilizador_novo
 
         elif opcao == 7 and tipo_user == 'Admin':
             os.system('cls')
             return None
 
-        elif opcao == 8 and tipo_user == 'Super Admin':
+        elif opcao == 7 and tipo_user == 'Super Admin':
             gestao_admins(connection)
             
-        elif opcao == 6 and tipo_user == 'Super Admin':
+        elif opcao == 8 and tipo_user == 'Super Admin':
             os.system('cls')
             return None
+
+# ------------------------------------
+def editar_perfil(connection, utilizador):
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    fetch_utilizador = """
+        SELECT *
+        FROM utilizador
+        WHERE email = %s
+    """
+    cursor.execute(fetch_utilizador, (utilizador['email'],))
+    utilizador_atual = cursor.fetchone()
+
+    os.system('cls')
+    print(" ***** Editar Perfil *****\n ")
+    table = PrettyTable()
+    table.field_names = ["#", "Tipo", "Info"]
+    table.add_row([1, "Nome", utilizador_atual['nome']])
+    table.add_row([2, "Password", "********"])
+    print(table)
+    print(" \n * 3. Regressar")
+
+    while True:
+        opcao = input("\n * Escolha uma opção -> ").strip()
+        if opcao.isdigit():
+            opcao = int(opcao)
+            if 1 <= opcao <= 3:
+                break
+        print(" * \n *** ATENÇÃO -> Opção inválida! ***")
+
+    if opcao == 1 or opcao == 2:
+        novo_dado = input(" \n * \n * Novo dado -> ")
+
+    if opcao == 1:
+        alterar_nome = """
+            UPDATE utilizador
+            SET nome = %s
+            WHERE email = %s
+        """
+        utilizador_atual['nome'] = novo_dado
+        cursor.execute(alterar_nome, (novo_dado, utilizador_atual['email'],))
+        connection.commit()
+        print(" * Dados atualizados com sucesso!")
+
+    elif opcao == 2:
+        if novo_dado != utilizador_atual['passe']:
+            cursor.execute("SELECT crypt(%s, gen_salt('bf'))", (novo_dado,))
+            password_encriptada = cursor.fetchone()[0]
+            alterar_password = """
+                UPDATE utilizador
+                SET passe = %s
+                WHERE email = %s
+            """
+            utilizador_atual['passe'] = password_encriptada
+            cursor.execute(alterar_password, (password_encriptada, utilizador_atual['email'],))
+            connection.commit()
+            print(" * Dados atualizados com sucesso!")
+        else:
+            print(" * A password é igual à anterior!")
+
+    input(" * \n * Regressar - Enter")
+    cursor.close()
+    return utilizador_atual
 
 # ------------------------------------
 def descricao_campos(connection):
@@ -124,30 +195,32 @@ def descricao_campos(connection):
         i += 1
 
     print(table)
-    print(" \n *", i + 1, "Regressar")
+    print(" \n *", i, "Regressar")
 
-    opcao = 0
-    while opcao < 1 or opcao > i + 1:
-        opcao = int(input(" * \n * Escolha um campo -> "))
+    while True:
+        opcao = input("\n * Escolha uma opção -> ").strip()
+        if opcao.isdigit():
+            opcao = int(opcao)
+            if 1 <= opcao <= i:
+                break
+        print(" * \n *** ATENÇÃO -> Opção inválida! ***")
 
-        if opcao == i + 1:
-            break
+    if opcao > 0 and opcao <= 3:
+        campo = campos[opcao - 1]
 
-        elif opcao > 0 and opcao <= i:
-            campo = campos[opcao - 1]
+        nova_descricao = input(" \n * Nova Descrição -> ")
 
-            nova_descricao = input(" \n * Nova Descrição ->")
+        alterar_descricao = """
+            UPDATE campo
+            SET descricao = %s
+            WHERE id_campo = %s
+        """
+        cursor.execute(alterar_descricao, (nova_descricao, campo['id_campo'],))
+        connection.commit()
 
-            alterar_descricao = """
-                UPDATE campo
-                SET descricao = %s
-                WHERE id_campo = %s
-            """
-            cursor.execute(alterar_descricao, (nova_descricao, campo['id_campo'],))
-            connection.commit()
-
-            print(" * Descrição alterada com sucesso!")
-            input(" * \n * Regressar - Enter")
+        print(" * Descrição alterada com sucesso!")
+        cursor.close()
+        input(" * \n * Regressar - Enter")
 
 # ------------------------------------
 def gestao_admins(connection):
@@ -251,7 +324,8 @@ def adicionar_admin(connection):
 
         print(" * Administrador adicionado com sucesso!")
         input(" * \n * Regressar - Enter")
-        
+    
+    cursor.close()
     return regressar
 
 # ------------------------------------
@@ -301,6 +375,7 @@ def remover_admin(connection):
         print(" *\n * Administrador removido com sucesso!")
         input(" * \n * Regressar - Enter")
         
+    cursor.close()
     return regressar
 
 # ------------------------------------
@@ -502,11 +577,11 @@ def estatisticas(connection):
             
             print(table)
             input(" \n * Regressar - Enter")
+    
+    cursor.close()
 
 # ------------------------------------
 def mensagens_admin(connection, utilizador, tipo_user):
-
-    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
     opcao = 1
     while opcao > 0 and opcao < 3:
@@ -619,6 +694,8 @@ def historico_mensagens(connection, utilizador, tipo_user):
                 print(" * Conteúdo: ", mensagem['conteudo'])
 
                 input(" * \n * Regressar - Enter")
+    
+    cursor.close()
 
 # ------------------------------------
 def enviar_mensagem(connection, utilizador):
@@ -671,6 +748,8 @@ def enviar_mensagem(connection, utilizador):
     elif opcao_mensagem == 2:
         mensagem.append(False)
 
+    print(utilizador['email'])
+    input(" ")
     mensagem.append(utilizador['email'])
 
     inserir_mensagem = """
@@ -740,6 +819,7 @@ def enviar_mensagem(connection, utilizador):
         
     print(" * Mensagem enviada com sucesso!")
     input(" * \n * Regressar - Enter")
+    cursor.close()
     return False
 
 # ------------------------------------
@@ -890,6 +970,7 @@ def alterar_precos(connection):
         connection.commit()
 
         print(" * Preço atualizado com sucesso!")
+        cursor.close()
         input(" * \n * Regressar - Enter")
 
 # ------------------------------------
@@ -1030,6 +1111,8 @@ def alterar_reservas_menu(connection):
 
                 print(" * Reserva cancelada com sucesso!")
                 input(" * \n * Regressar - Enter")
+
+    cursor.close()
 
 # ------------------------------------
 def alterar_reservas(connection, reserva_a_alterar, reservas_futuras_corretas):
@@ -1237,6 +1320,8 @@ def alterar_reservas(connection, reserva_a_alterar, reservas_futuras_corretas):
 
         print(" * Hora atualizada!")
         input(" * \n * Regressar - Enter")
+    
+    cursor.close()
 
 # ------------------------------------
 def menu_cliente(connection, utilizador):
@@ -1284,14 +1369,6 @@ def mensagens_cliente(connection, utilizador):
         """
         cursor.execute(fetch_mensagens, (utilizador['email'],))
         mensagens = cursor.fetchall()
-
-        fetch_admin = """
-            SELECT nome
-            FROM administrador, utilizador
-            WHERE utilizador_email = email
-        """
-        cursor.execute(fetch_admin)
-        nome_admin, = cursor.fetchone()
 
         count_lidas = 0
         count_gerais = 0
@@ -1341,6 +1418,13 @@ def mensagens_cliente(connection, utilizador):
             print(" *\n *\n * Mensagens do administrador *\n *")
             for mensagem in mensagens:
                 if not mensagem['geral'] and mensagem['lida']:
+                    fetch_admin = """
+                        SELECT nome
+                        FROM administrador, utilizador
+                        WHERE utilizador_email = email AND utilizador_email = %s
+                    """
+                    cursor.execute(fetch_admin, (mensagem['administrador_utilizador_email'],))
+                    nome_admin, = cursor.fetchone()
                     print(f" * {i}. {mensagem['assunto']}, enviada a {mensagem['data_envio'].strftime('%d/%m')}, por {nome_admin}")
                     i += 1
                     mensagens_privadas.append(mensagem)
@@ -1386,7 +1470,17 @@ def mensagens_cliente(connection, utilizador):
                 print(" * \n * Opção inválida! * ")
 
         if not regressar:
+
+            fetch_admin = """
+                SELECT nome
+                FROM administrador, utilizador
+                WHERE utilizador_email = email AND utilizador_email = %s
+            """
+            cursor.execute(fetch_admin, (mensagem['administrador_utilizador_email'],))
+            nome_admin, = cursor.fetchone()
+
             os.system('cls')
+
             print(" ***** Mensagem *****\n *")
             print(" * De:", nome_admin, ", a", mensagem_escolhida['data_envio'].strftime("%d/%m/%Y"))
             print(" * Assunto:", mensagem_escolhida['assunto'])
@@ -1405,6 +1499,8 @@ def mensagens_cliente(connection, utilizador):
                 connection.commit()
 
             input(" * \n * Regressar - Enter")
+        
+        cursor.close()
 
 # ------------------------------------
 def informacoes_e_perfil(connection, utilizador):
@@ -1437,18 +1533,17 @@ def informacoes_e_perfil(connection, utilizador):
     table = PrettyTable()
     table.field_names = ["#", "Info", "Cliente"]
     table.add_row([1, "Nome", cliente['nome']])
-    table.add_row([2, "Email", utilizador['email']])
-    table.add_row([3, "NIF", cliente['nif']])
-    table.add_row([4, "Telemóvel", cliente['numero_telefone']])
+    table.add_row([2, "NIF", cliente['nif']])
+    table.add_row([3, "Telemóvel", cliente['numero_telefone']])
     print(table)
-    print(" \n * 5. Regressar")
+    print(" \n * 4. Regressar")
 
     regressar = False
     opcao = 0
-    while opcao < 1 or opcao > 5:
+    while opcao < 1 or opcao > 4:
         opcao = int(input(" * \n * Escolha uma opção -> "))
 
-        if opcao == 5:
+        if opcao == 4:
             regressar = True
 
     if not regressar:
@@ -1464,33 +1559,6 @@ def informacoes_e_perfil(connection, utilizador):
             connection.commit()
 
         elif opcao == 2:
-            novo_email = input(" * Indique o novo email -> ")
-
-            atualizar_email_cliente_query = """
-                    UPDATE cliente
-                    SET utilizador_email = NULL
-                    WHERE utilizador_email = %s
-                """
-            cursor.execute(atualizar_email_cliente_query, (utilizador['email'],))
-
-            atualizar_email = """
-                UPDATE utilizador
-                SET email = %s
-                WHERE email = %s
-            """
-            cursor.execute(atualizar_email, (novo_email, utilizador['email']))
-            connection.commit()
-
-            atualizar_email_cliente = """
-                UPDATE cliente
-                SET utilizador_email = %s
-                WHERE utilizador_email = %s
-            """
-            cursor.execute(atualizar_email_cliente, (novo_email, utilizador['email']))
-            connection.commit()
-            
-
-        elif opcao == 3:
             novo_nif = int(input(" * Indique o novo NIF -> "))
             atualizar_nif = """
                 UPDATE cliente
@@ -1500,7 +1568,7 @@ def informacoes_e_perfil(connection, utilizador):
             cursor.execute(atualizar_nif, (novo_nif, utilizador['email']))
             connection.commit()
 
-        elif opcao == 4:
+        elif opcao == 3:
             novo_telefone = int(input(" * Indique o novo número de telemóvel -> "))
             atualizar_telefone = """
                 UPDATE cliente
@@ -1513,6 +1581,7 @@ def informacoes_e_perfil(connection, utilizador):
         print(" * Atualização efetuada com sucesso!")   
         input(" * \n * Regressar - Enter")
     
+    cursor.close()
     return regressar
 
 # ------------------------------------
@@ -1634,6 +1703,8 @@ def efetuar_reserva(connection, utilizador):
 
         print(" * \n * Reserva efetuada com sucesso! * ")
         input(" * \n * Regressar - Enter")
+
+    cursor.close()
 
 # ------------------------------------
 def apresentar_reservas(connection, utilizador, data_para_reservas):
@@ -1779,6 +1850,7 @@ def apresentar_reservas(connection, utilizador, data_para_reservas):
                             break
         
 
+    cursor.close()
     return opcao, i, hora_escolhida, campo_escolhido, reservas_hoje
 
 # ------------------------------------
@@ -1974,6 +2046,8 @@ def reservas_atuais(connection, utilizador):
 
             input(" * \n * Regressar - Enter")
 
+    cursor.close()
+
 # ------------------------------------
 def historico_reservas(connection, utilizador):
     
@@ -2013,6 +2087,7 @@ def historico_reservas(connection, utilizador):
 
     print(table)
     input("\n * Regressar - Enter")
+    cursor.close()
 
 # ------------------------------------
 # retorna "Super Admin", "Admin", "Cliente" ou "Ambos"
@@ -2049,6 +2124,7 @@ def tipo_utilizador(connection, utilizador):
     else:
         tipo_user = 'Cliente'
 
+    cursor.close()
     return tipo_user
 
 # ------------------------------------
@@ -2058,52 +2134,53 @@ def login(connection):
     print(" ***** Login *****")
     print(" * \n * Login com os seus dados\n *")
 
-    email_invalido = True
-    passe_invalida = True
+    while True:
 
-    while email_invalido or passe_invalida:
+        email_invalido = False
+        passe_invalida = False
+        padrao_email = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 
         email = str(123)
-        while email.isdigit():
+        while email.isdigit() or not email.strip() or not re.match(padrao_email, email):
             email = input(" * Email: ")
-            if email.isdigit():
+            if email.isdigit() or not email.strip() or not re.match(padrao_email, email):
                 print("\n *** ATENÇÃO -> Input inválido ***")
 
         passe = str(123)
-        while passe.isdigit():
+        while passe.isdigit() or not passe.strip():
             passe = input(" * Password: ")
-            if passe.isdigit():
+            if passe.isdigit() or not passe.strip():
                 print("\n *** ATENÇÃO -> Input inválido! ***")
 
         # fetch de utilizadores
         cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
         fetch_utilizadores = """ 
-            SELECT email, passe, nome 
+            SELECT *
             FROM utilizador
-            WHERE email = %s AND passe = %s
+            WHERE email = %s
         """
-        
-        cursor.execute(fetch_utilizadores, (email, passe))
+        cursor.execute(fetch_utilizadores, (email,))
         linha = cursor.fetchone()
 
         # verificar se o utilizador existe
         utilizador = []
         if linha is None:
+            print(" * \n *** ATENÇÃO -> Utilizador não encontrado! ***")
             email_invalido = True
+            continue
+
+        cursor.execute("SELECT crypt(%s, passe) = passe FROM utilizador WHERE email = %s", (passe, email))
+        
+        if not cursor.fetchone()[0]:
             passe_invalida = True
-
-        elif email == linha['email']:
-            email_invalido = False
-
-            if passe == linha['passe']:
-                passe_invalida = False
-                nome = linha['nome']
-                utilizador = {'email': email, 'passe': passe, 'nome': nome}
-            else:
-                passe_invalida = True
 
         if email_invalido or passe_invalida:
             print(" * \n *** ATENÇÃO -> Um dos campos está inválido! ***")
+            continue
+        
+        nome = linha['nome']
+        utilizador = {'email': email, 'passe': passe, 'nome': nome}
+        break
 
     print(" * \n * \n * Login efetuado com sucesso! * ")
 
@@ -2115,123 +2192,119 @@ def login(connection):
     print(" * \n * Bem vindo,", tipo_user, nome)
 
     input(" * \n * Regressar - Enter")
+    cursor.close()
     return utilizador
 
 # ------------------------------------
 def register(connection):
-    os.system('cls')
 
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
     user = []
 
+    os.system('cls')
     print(" ***** Registar *****")
     print(" * \n * Registe os seus dados\n *")
 
-    # adicionar whiles de segurança
     nome = input(" * Nome: ")
 
-    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
-    email_existe = True
-    while email_existe:
+    padrao_email = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    while True:
+        
         email = input(" * Email: ")
-
-        fetch_utilizadores = """
-            SELECT nome, email, passe
-            FROM utilizador
-        """
-
-        cursor.execute(fetch_utilizadores)
-        linhas = cursor.fetchall()
-
-        for linha in linhas:
-            if email == linha['email']:
-                email_existe = True
-                print(" * \n *** ATENÇÃO -> Email já registado! ***")
-                break
-            else:
-                email_existe = False
+        
+        if not re.match(padrao_email, email):
+            print(" * \n *** ATENÇÃO -> Email inválido! ***")
+        
+        else:
+            try:
+                cursor.execute("SELECT email FROM utilizador WHERE email = %s", (email,))
+                if cursor.fetchone():
+                    print(" * \n *** ATENÇÃO -> Email já registado! ***")
+                else:
+                    break
+            except psycopg2.Error as e:
+                print(" * \n *** ERRO -> Falha ao verificar o email! ***")
+                print(e)
+                input("ora colas")
 
     password = input(" * Password: ")
+    cursor.execute("SELECT crypt(%s, gen_salt('bf'))", (password,))
+    password_encriptada = cursor.fetchone()[0]
 
     # tem de ser por esta ordem!
     user.append(email)
-    user.append(password)
+    user.append(password_encriptada)
     user.append(nome)
 
-    # insere utilizador (antes de inserir admin ou cliente)
-    #insere_user = "INSERT INTO utilizador VALUES (%s, crypt(%s, gen_salt('bf')), %s)"
-    #cursor.execute(insere_user, user)
-    #connection.commit()
+    try:
+        # Insert user data into the utilizador table
+        cursor.execute("INSERT INTO utilizador (email, passe, nome) VALUES (%s, %s, %s)", (user))
+        connection.commit()
 
-    print(" RETIRAR ISTO DEPOIS!!! ")
-    print(" * \n * \n * Tipo de utilizador\n *")
-    print(" * 1 - Admin")
-    print(" * 2 - Cliente\n * ")
+    except psycopg2.Error as e:
+        connection.rollback()
+        print(" * \n *** ERRO -> Falha ao inserir utilizador! ***")
+        print(e)
+        input("ora golas")
+        return None
 
-    tipo = int(input(" * Escolha uma opção -> "))
+    user_cliente = []
 
-    if tipo == 1:
+    print(" * \n * ")
 
-        user_admin = []
-
-        print(" * \n * ")
-        print(" * Super Admin\n * ")
-        print(" * 1 - Sim")
-        print(" * 0 - Não\n * ")
-        sa = int(input(" * Escolha uma opção -> "))
-
-        if sa:
-            user_admin.append(True)
+    nif = 0
+    while True:
+        nif = input(" * NIF: ")
+        if len(nif) == 9 and nif.isdigit():
+            try:
+                cursor.execute("SELECT nif FROM cliente WHERE nif = %s", (nif,))
+                if cursor.fetchone():
+                    print(" * \n *** ATENÇÃO -> NIF já registado! ***")
+                else:
+                    break
+            except psycopg2.Error as e:
+                print(" * \n *** ERRO -> Falha ao verificar o NIF! ***")
+                print(e)
         else:
-            user_admin.append(False)
+            print("\n *** ATENÇÃO -> NIF inválido! ***")
 
-        user_admin.append(email)
+    telemovel = 0
+    while True:
+        telemovel = input(" * Telemóvel: ")
+        if len(telemovel) == 9 and telemovel.isdigit():
+            try:
+                cursor.execute("SELECT numero_telefone FROM cliente WHERE numero_telefone = %s", (telemovel,))
+                if cursor.fetchone():
+                    print(" * \n *** ATENÇÃO -> Número de telefone já registado! ***")
+                else:
+                    break
+            except psycopg2.Error as e:
+                print(" * \n *** ERRO -> Falha ao verificar o número de telefone! ***")
+                print(e)
+        else:
+            print("\n *** ATENÇÃO -> telemovel inválido! ***")
 
-        # inserir utilizador + admin
+    user_cliente.append(nif)
+    user_cliente.append(telemovel)
+    user_cliente.append(email)
 
-        # insere utilizador (antes de inserir admin ou cliente)
-        insere_user = "INSERT INTO utilizador VALUES (%s, crypt(%s, gen_salt('bf')), %s)"
-        cursor.execute(insere_user, user)
-        connection.commit()
-
-        insere_admin = "INSERT INTO administrador VALUES (%s, %s)"
-        cursor.execute(insere_admin, user_admin)
-        connection.commit()
-
-        print(" * \n * \n * Registo efetuado com os dados acima indicados! * ")
-
-    else:   
-        user_cliente = []
-
-        print(" * \n * ")
-        nif = str(9999999999)
-        while len(nif) > 9 or not nif.isdigit():
-            nif = input(" * NIF: ")
-            if len(nif) > 9 or not nif.isdigit():
-                print("\n *** ATENÇÃO -> NIF inválido! ***")
-
-        telemovel = str(9999999999)
-        while len(telemovel) > 9 or not telemovel.isdigit():
-            telemovel = input(" * Telemóvel: ")
-            if len(telemovel) > 9 or not telemovel.isdigit():
-                print("\n *** ATENÇÃO -> Telemóvel inválido! ***")
-
-        user_cliente.append(nif)
-        user_cliente.append(telemovel)
-        user_cliente.append(email)
-
-        # inserir utilizador + cliente
-        # insere utilizador (antes de inserir admin ou cliente)
-        insere_user = "INSERT INTO utilizador VALUES (%s, crypt(%s, gen_salt('bf')), %s)"
-        cursor.execute(insere_user, user)
-        connection.commit()
-
-        insere_admin = "INSERT INTO cliente VALUES (%s, %s, %s)"
-        cursor.execute(insere_admin, user_cliente)
+    try:
+        # Insert client data into the cliente table
+        insere_cliente = "INSERT INTO cliente VALUES (%s, %s, %s)"
+        cursor.execute(insere_cliente, user_cliente)
         connection.commit()
 
         print(" * \n * \n * Registo efetuado com os dados acima indicados! * ")
+
+    except psycopg2.Error as e:
+        connection.rollback()
+        print(" * \n *** ERRO -> Falha ao inserir cliente! ***")
+        print(e)
+        input("ora bolas")
+        return None
 
     input(" * Regressar - Enter")
+    cursor.close()
     return user
 
 # ------------------------------------
@@ -2247,7 +2320,7 @@ def apresentar_menu_admin(tipo_user, utilizador):
     print(" * 3 - Estatísticas")
     print(" * 4 - Mensagem")
     print(" * 5 - Descrição Campos")
-    print(" * 6 - Editar Perfil*")
+    print(" * 6 - Editar Perfil")
     
     if tipo_user == 'Admin':
         print(" * 7 - Logout | Sair\n *")
@@ -2255,11 +2328,13 @@ def apresentar_menu_admin(tipo_user, utilizador):
         print(" * 7 - Gestão de Admins")
         print(" * 8 - Logout | Sair\n *")
 
-    opcao = 0
-    while opcao < 1 or (opcao > 5 and tipo_user == 'Admin') or (opcao > 6 and tipo_user == 'Super Admin'):
-        opcao = int(input(" * Escolha uma opção -> "))
-
-    return opcao
+    while True:
+        opcao = input(" * Escolha uma opção -> ").strip()
+        if opcao.isdigit():
+            opcao = int(opcao)
+            if (1 <= opcao <= 7 and tipo_user == 'Admin') or (1 <= opcao <= 8 and tipo_user == 'Super Admin'):
+                return opcao
+        print(" * \n *** ATENÇÃO -> Opção inválida! ***")
 
 # ------------------------------------
 def apresentar_menu_cliente(utilizador):
@@ -2272,11 +2347,13 @@ def apresentar_menu_cliente(utilizador):
     print(" * 5 - Mensagens")
     print(" * 6 - Logout | Sair\n *")
 
-    opcao = 0
-    while opcao < 1 or opcao > 6:
-        opcao = int(input(" * Escolha uma opção -> "))
-
-    return opcao
+    while True:
+        opcao = input(" * Escolha uma opção -> ").strip()
+        if opcao.isdigit():
+            opcao = int(opcao)
+            if 1 <= opcao <= 6:
+                return opcao
+        print(" * \n *** ATENÇÃO -> Opção inválida! ***")
 
 # ------------------------------------
 def menu():
@@ -2288,11 +2365,13 @@ def menu():
     print(" * 2 - Registar")
     print(" * 3 - Sair\n * ")
 
-    opcao = 0
-    while opcao < 1 or opcao > 3:
-        opcao = int(input(" * Escolha uma opção -> "))
-
-    return opcao
+    while True:
+        opcao = input(" * Escolha uma opção -> ").strip()
+        if opcao.isdigit():
+            opcao = int(opcao)
+            if 1 <= opcao <= 3:
+                return opcao
+        print(" * \n *** ATENÇÃO -> Opção inválida! ***")
 
 # ------------------------------------
 def atualiza_campos(connection):
@@ -2327,6 +2406,8 @@ def atualiza_campos(connection):
         print("Fields updated successfully\n\n")
     else:
         print("\n")
+        
+    cursor.close()
 
 # ------------------------------------
 def database_connection():

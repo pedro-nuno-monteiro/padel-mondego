@@ -1,14 +1,13 @@
--- assim
---crypt('password1', gen_salt('bf', 8));
+-- dummy data insert
 
 -- tabela utilizador
 INSERT INTO utilizador (email, passe, nome) VALUES
-('afonso@gmail.com', 'password1', 'Afonso Jorge'),
-('luis@gmail.com', 'password2', 'Luis Pedro'),
-('admin', 'admin', 'Pedro Monteiro'),
-('admin1', 'admin1', 'Empregado 1'),
-('admin2', 'admin2', 'Empregado 2'),
-('sadmin', 'sadmin', 'Maria Carolina');
+('afonso@gmail.com', crypt('password1', gen_salt('bf', 8)), 'Afonso Jorge'),
+('luis@gmail.com', crypt('password2', gen_salt('bf', 8)), 'Luis Pedro'),
+('admin@gmail.com', crypt('admin', gen_salt('bf', 8)), 'Pedro Monteiro'),
+('admin1@gmail.com', crypt('admin1', gen_salt('bf', 8)), 'Empregado 1'),
+('admin2@gmail.com', crypt('admin2', gen_salt('bf', 8)), 'Empregado 2'),
+('sadmin@gmail.com', crypt('sadmin', gen_salt('bf', 8)), 'Maria Carolina');
 
 -- tabela cliente
 INSERT INTO cliente (nif, numero_telefone, utilizador_email) VALUES
@@ -17,10 +16,10 @@ INSERT INTO cliente (nif, numero_telefone, utilizador_email) VALUES
 
 -- tabela admin
 INSERT INTO administrador (super_admin, utilizador_email) VALUES
-(TRUE, 'sadmin'),
-(FALSE, 'admin'),
-(FALSE, 'admin1'), -- mudar depois de testes
-(FALSE, 'admin2');
+(TRUE, 'sadmin@gmail.com'),
+(FALSE, 'admin@gmail.com'),
+(FALSE, 'admin1@gmail.com'),
+(FALSE, 'admin2@gmail.com');
 
 -- tabela campo
 INSERT INTO campo (id_campo, descricao) VALUES
@@ -60,23 +59,18 @@ INSERT INTO reserva (id_reserva, horario, estado, price_id_custo, campo_id_campo
 
 -- tabela mensagem
 INSERT INTO mensagem (id_mensagem, assunto, conteudo, data_envio, geral, administrador_utilizador_email) VALUES
-(1, 'Promoção de Verão', 'Não percam as nossas promoções de verão!', '2024-04-08', FALSE, 'admin'),
-(2, 'Aviso de manutenção', 'O campo 2 estará fechado para manutenção na próxima semana!', '2024-04-09', FALSE, 'admin1'),
-(3, 'Aviso de chuva', 'O campo 2 estará molhado!', '2024-04-09', FALSE, 'admin1');
+(1, 'Promoção de Verão', 'Não percam as nossas promoções de verão!', '2024-04-08', FALSE, 'admin@gmail.com'),
+(2, 'Aviso de manutenção', 'O campo 2 estará fechado para manutenção na próxima semana!', '2024-04-09', FALSE, 'admin1@gmail.com'),
+(3, 'Aviso de chuva', 'O campo 2 estará molhado!', '2024-04-09', FALSE, 'admin1@gmail.com');
 
 -- tabela mensagem_cliente
 INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_email) VALUES
 (TRUE, 1, 'afonso@gmail.com'),
 (FALSE, 2, 'luis@gmail.com');
 
--- tabela permissoes
-INSERT INTO permissoes (alterar_preco, alterar_reserva, cancelar_reserva, conceder_cliente, remover_cliente) VALUES
-(TRUE, TRUE, TRUE, TRUE, TRUE),
-(TRUE, TRUE, TRUE, FALSE, FALSE);
-
 -- tabela admin_permissoes
 INSERT INTO administrador_permissoes (administrador_utilizador_email) VALUES
-('sadmin'),
-('admin'),
-('admin1'),
-('admin2');
+('sadmin@gmail.com'),
+('admin@gmail.com'),
+('admin1@gmail.com'),
+('admin2@gmail.com');
