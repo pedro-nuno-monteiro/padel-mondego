@@ -1,5 +1,9 @@
 CREATE EXTENSION pgcrypto;
 
+CREATE SEQUENCE reserva_id_reserva_seq START WITH 9;
+CREATE SEQUENCE price_id_custo_seq START WITH 5;
+CREATE SEQUENCE mensagem_id_mensagem_seq START WITH 4;
+
 CREATE TABLE cliente (
 	nif		 NUMERIC(9,0),
 	numero_telefone	 NUMERIC(9,0),
@@ -81,3 +85,25 @@ ALTER TABLE mensagem ADD CONSTRAINT mensagem_fk1 FOREIGN KEY (administrador_util
 ALTER TABLE administrador ADD CONSTRAINT administrador_fk1 FOREIGN KEY (utilizador_email) REFERENCES utilizador(email);
 ALTER TABLE mensagem_cliente ADD CONSTRAINT mensagem_cliente_fk1 FOREIGN KEY (mensagem_id_mensagem) REFERENCES mensagem(id_mensagem);
 ALTER TABLE mensagem_cliente ADD CONSTRAINT mensagem_cliente_fk2 FOREIGN KEY (cliente_utilizador_email) REFERENCES cliente(utilizador_email);
+
+-- sequência
+
+-- trigger
+CREATE OR REPLACE FUNCTION jogo_reservado_termina()
+RETURNS trigger AS $$
+BEGIN
+	IF OLD.estado = 'Reservado' AND NEW.estado = 'Finalizado' THEN
+		UPDATE reserva
+		SET estado = 'Em Espera Cancelado'
+		WHERE estado = 'Em Espera'
+		AND campo_id_campo = OLD.campo_id_campo 
+		AND horario = OLD.horario;
+    END IF;
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_estado_em_espera_trigger
+AFTER UPDATE ON reserva
+FOR EACH ROW
+EXECUTE FUNCTION jogo_reservado_termina();

@@ -68,8 +68,6 @@ def main():
             else:
                 menu_cliente(connection, utilizador)
 
-    print("fim")
-
 # ------------------------------------
 def menu_admin(connection, utilizador, tipo_user):
     
@@ -168,7 +166,6 @@ def editar_perfil(connection, utilizador):
         else:
             print(" * A password é igual à anterior!")
 
-    input(" * \n * Regressar - Enter")
     cursor.close()
     return utilizador_atual
 
@@ -385,7 +382,7 @@ def estatisticas(connection):
     
     os.system('cls')
     print(" ***** Estatísticas *****\n *")
-    print(" * * Num determinado período,\n * ")
+    print(" * * Num determinado período (inclusivé),\n * ")
     print(" * 1. Campo mais reservado")
     print(" * 2. Horário mais reservado")
     print(" * 3. Listar campos, por horário, sem reservas")
@@ -447,9 +444,10 @@ def estatisticas(connection):
             cursor.execute(fetch_horarios_periodo, (data_inicial, data_final))
             mais_horario_periodo = cursor.fetchall()
 
-            count_horarios = {"15h00": 0, "16h30": 0, "18h00": 0, "19h30": 0, "21h00": 0, "22h30": 0}
+            count_horarios = {"15h00": 0, "16h30": 0, "18h00": 0, "19h30": 0, "21h00": 0, "22h30": 0, "10h00": 0, "11h30": 0,
+                                "13h00": 0, "14h30": 0, "16h00": 0, "17h30": 0, "19h00": 0, "20h30": 0}
+
             for reserva in mais_horario_periodo:
-                # ATENÇÃO!! QUANDO SE CORRIGIR PARA FIM DE SEMANA TIRAR ISTO
                 if reserva['horario'].strftime("%Hh%M") not in count_horarios:
                     continue
                 count_horarios[reserva['horario'].strftime("%Hh%M")] += 1
@@ -472,38 +470,68 @@ def estatisticas(connection):
             tipo_menu = " ***** Campos sem reservas *****\n *"
             data_inicial, data_final = menu_periodo(tipo_menu)
 
-            fetch_horarios_periodo = """
-                SELECT *
+            horarios_semana = ["15h00", "16h30", "18h00", "19h30", "21h00", "22h30"]
+            horarios_fds = ["10h00", "11h30", "13h00", "14h30", "16h00", "17h30", "19h00", "20h30"]
+            
+            todos_horarios = []
+            current_date = data_inicial
+            while current_date <= data_final:
+                
+                if current_date.weekday() < 5:
+                    for horario in horarios_semana:
+                        todos_horarios.append((current_date, horario))
+                else:
+                    for horario in horarios_fds:
+                        todos_horarios.append((current_date, horario))
+                
+                current_date += timedelta(days = 1)
+
+            fetch_reservations = """
+                SELECT horario, campo_id_campo
                 FROM reserva
                 WHERE horario >= %s AND horario <= %s
-                ORDER BY campo_id_campo, horario
             """
-            cursor.execute(fetch_horarios_periodo, (data_inicial, data_final))
-            reservas = cursor.fetchall()
+            cursor.execute(fetch_reservations, (data_inicial, data_final))
+            reservations = [(reserva['horario'].strftime("%d/%m"), reserva['horario'].strftime("%Hh%M"), reserva['campo_id_campo']) for reserva in cursor.fetchall()]
 
-            numero_dias = (data_final - data_inicial).days
+            for r in reservations:
+                print(r)
 
-            count_campos = {1: 0, 2: 0, 3: 0}
-            count_horarios = {"15h00": 0, "16h30": 0, "18h00": 0, "19h30": 0, "21h00": 0, "22h30": 0}
-            for reserva in reservas:
-                if reserva['estado'] == 'Reservado' or reserva['estado'] == 'Em Espera' and reserva['horario'].strftime("%Hh%M") in count_horarios:
-                    count_campos[reserva['campo_id_campo']] += 1
+            for slot in todos_horarios:
+                print(slot)
 
-            # falta verificar fins de semana...!
-            count_campos[1] = len(count_horarios) * numero_dias - count_campos[1]
-            count_campos[2] = len(count_horarios) * numero_dias - count_campos[2]
-            count_campos[3] = len(count_horarios) * numero_dias - count_campos[3]
+            input(" ")
 
+            # Find timetable slots without reservations
+            timetables_without_reservations = [timetable for timetable in todos_horarios if timetable not in reservations]
+
+            # Group timetable slots without reservations by day and field
+            timetables_by_day_field = {}
+            for timetable in timetables_without_reservations:
+                day = timetable[0].strftime("%d/%m")
+                field = timetable[1]
+                if day not in timetables_by_day_field:
+                    timetables_by_day_field[day] = {1: [], 2: [], 3: []}
+                timetables_by_day_field[day][field].append(timetable)
+
+            # Print timetables without reservations grouped by day and field
             os.system('cls')
             print(" ***** Campos sem reservas *****\n *")
-            print(" * Período: (", data_inicial, " a ", data_final, ")\n ")
-            sorted_count = sorted(count_campos.items(), key = lambda x: x[1], reverse = True)
+            print(" * Período: (", data_inicial.strftime("%d/%m/%Y"), " a ", data_final.strftime("%d/%m/%Y"), ")\n ")
 
-            for campo, reservations in sorted_count:
-                print(f" * Campo {campo} não teve {reservations} reservas\n *")
-            
+            if timetables_by_day_field:
+                for day, fields in timetables_by_day_field.items():
+                    print(f"{day}")
+                    for field, timetables in fields.items():
+                        print(f"\nField {field}")
+                        for timetable in timetables:
+                            print(timetable[1].strftime("%Hh%M"))
+            else:
+                print(" * Todos os horários foram reservados neste período.\n *")
+
             input(" \n * Regressar - Enter")
-        
+
+
         elif opcao == 4:
             tipo_menu = " ***** Reservas canceladas *****\n *"
             data_inicial, data_final = menu_periodo(tipo_menu)
@@ -702,13 +730,6 @@ def enviar_mensagem(connection, utilizador):
 
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
-    fetch_mensagens = """
-        SELECT max(id_mensagem) as id_mensagem
-        FROM mensagem
-    """
-    cursor.execute(fetch_mensagens)
-    id_mensagem, = cursor.fetchone()
-
     os.system('cls')
     print(" ***** Enviar Mensagem *****\n *")
 
@@ -733,8 +754,6 @@ def enviar_mensagem(connection, utilizador):
     conteudo = input(" \n * Mensagem -> ")
 
     mensagem = []
-    id_correto = id_mensagem + 1
-    mensagem.append(id_correto)
     mensagem.append(assunto)
     mensagem.append(conteudo)
 
@@ -748,15 +767,16 @@ def enviar_mensagem(connection, utilizador):
     elif opcao_mensagem == 2:
         mensagem.append(False)
 
-    print(utilizador['email'])
-    input(" ")
     mensagem.append(utilizador['email'])
+
+    cursor.execute("SELECT nextval('mensagem_id_mensagem_seq')")
+    id_correto = cursor.fetchone()[0]
 
     inserir_mensagem = """
         INSERT INTO mensagem (id_mensagem, assunto, conteudo, data_envio, geral, administrador_utilizador_email)
         VALUES (%s, %s, %s, %s, %s, %s)
     """
-    cursor.execute(inserir_mensagem, mensagem)
+    cursor.execute(inserir_mensagem, (id_correto, mensagem[0], mensagem[1], mensagem[2], mensagem[3], mensagem[4]))
     connection.commit()
 
     fetch_clientes = """
@@ -855,7 +875,6 @@ def menu_periodo(tipo_menu):
                     except ValueError:
                         print(" * \n * Data inválida. Insira no formato yyyy-mm-dd.")
     
-    data_final = data_final + timedelta(days = 1)
     return data_inicial, data_final
 
 # ------------------------------------
@@ -950,13 +969,12 @@ def alterar_precos(connection):
                 print(" * \n * ATENÇÃO -> Preço igual ao anterior! * ")
 
         # acrescenta novo preco
-        proximo_id_custo = max([preco['id_custo'] for preco in precos_totais]) + 1
-        data_alteracao = date(year = 2024, month = 4, day = 16)
+        data_alteracao = datetime.now().date()
         atualizar_preco = """
             INSERT INTO price (id_custo, tipo_dia, horario, data_alteracao, ativo, valor_antigo, preco_atual)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (nextval('price_id_custo_seq'), %s, %s, %s, %s, %s, %s)
         """
-        cursor.execute(atualizar_preco, (proximo_id_custo, preco_a_alterar['tipo_dia'], preco_a_alterar['horario'],
+        cursor.execute(atualizar_preco, (preco_a_alterar['tipo_dia'], preco_a_alterar['horario'],
                                         data_alteracao, True, preco_a_alterar['preco_atual'], novo_preco))
         connection.commit()
 
@@ -978,8 +996,6 @@ def alterar_reservas_menu(connection):
 
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
-    data_teste = datetime(year = 2024, month = 4, day = 16, hour = 12, minute = 00, second = 00)
-
     fetch_reservas_futuras = """
         SELECT 
             u.email, u.nome, r.id_reserva, r.horario AS r_horario, 
@@ -992,8 +1008,7 @@ def alterar_reservas_menu(connection):
             u.email, r.horario, r.campo_id_campo
     """
     
-    #cursor.execute(fetch_reservas_futuras, (datetime.now(),))
-    cursor.execute(fetch_reservas_futuras, (data_teste,))
+    cursor.execute(fetch_reservas_futuras, (datetime.now(),))
     reservas_futuras = cursor.fetchall()
 
     os.system("cls")
@@ -1103,7 +1118,7 @@ def alterar_reservas_menu(connection):
             if not ja_cancelado:
                 cancelar_reserva = """
                     UPDATE reserva
-                    SET estado = 'Cancelado'
+                    SET estado = 'Alterado Cancelado'
                     WHERE id_reserva = %s
                 """
                 cursor.execute(cancelar_reserva, (reserva_a_alterar['id_reserva'],))
@@ -1185,7 +1200,7 @@ def alterar_reservas(connection, reserva_a_alterar, reservas_futuras_corretas):
             UPDATE reserva
             SET campo_id_campo = %s,
                 estado = 'Alterado Reservado'
-            WHERE WHERE id_reserva = %s
+            WHERE id_reserva = %s
         """
         cursor.execute(atualizar_reserva, (novo_campo, reserva_a_alterar['id_reserva']))
         connection.commit()
@@ -1200,8 +1215,8 @@ def alterar_reservas(connection, reserva_a_alterar, reservas_futuras_corretas):
         dia = reserva_a_alterar['r_horario'].day
         
         # dia de hoje
-        hoje = datetime(year = 2024, month = 4, day = 16).day
-        #hoje = datetime.now().day
+        #hoje = datetime(year = 2024, month = 4, day = 16).day
+        hoje = datetime.now().day
 
         outros_dias = []
         table_outros_dias = PrettyTable()
@@ -1221,7 +1236,7 @@ def alterar_reservas(connection, reserva_a_alterar, reservas_futuras_corretas):
             print(table_outros_dias)
         
         else:
-            print(" * \n * Não há reservas noutros campos, nas mesmas situações* ")
+            print(" * \n * Não há reservas noutros campos, nas mesmas situações * ")
 
         novo_dia = dia
         opcao_invalida_2 = True
@@ -1333,7 +1348,6 @@ def menu_cliente(connection, utilizador):
         if opcao == 1:
             voltar = informacoes_e_perfil(connection, utilizador)
             
-            # ver se dá para implementar isto algures
             if voltar:
                 opcao = 0
 
@@ -1500,7 +1514,7 @@ def mensagens_cliente(connection, utilizador):
 
             input(" * \n * Regressar - Enter")
         
-        cursor.close()
+    cursor.close()
 
 # ------------------------------------
 def informacoes_e_perfil(connection, utilizador):
@@ -1525,7 +1539,7 @@ def informacoes_e_perfil(connection, utilizador):
     print(" ***** Informações do clube Padel Mondego *****\n *")
     print(" * Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n * Nunc cursus porttitor nisi a venenatis. \n * Mauris elementum tincidunt nisi eu consequat.\n * Cras tristique libero cursus sem eleifend facilisis.\n * In hac habitasse platea dictumst.")
 
-    print(" \n***** Descrição de Campos *****\n *")
+    print(" \n ***** Descrição de Campos *****\n *")
     for campo in campos:
         print(" *", campo['descricao'])
 
@@ -1589,9 +1603,7 @@ def efetuar_reserva(connection, utilizador):
 
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
-    # apenas definir a data de hoje e de amanhã, sem horas
-    data_para_reservas = datetime(year = 2024, month = 4, day = 16, hour = 0, minute = 0, second = 0)
-    # data_para_reservas = datetime.now().replace(hour = 0, minute = 0, second = 0)
+    data_para_reservas = datetime.now().replace(hour = 0, minute = 0, second = 0)
     
     opcao = 0
     regressar = False
@@ -1606,8 +1618,8 @@ def efetuar_reserva(connection, utilizador):
             print(" * Selecione o dia que quer reservar *\n * ")  
 
             # dia de HOJE
-            hoje = datetime(year = 2024, month = 4, day = 16, hour = 0, minute = 0, second = 0).day
-            # dia = datetime.now().day
+            #hoje = datetime(year = 2024, month = 4, day = 16, hour = 0, minute = 0, second = 0).day
+            hoje = datetime.now().day
             dias_seguintes = []
 
             contador = 1
@@ -1641,21 +1653,10 @@ def efetuar_reserva(connection, utilizador):
         # efetuar reserva: "id_reserva, horario, estado, price_id_custo, campo_id_campo, cliente_utilizador_email"
         reserva_a_efetuar = []
         
-        # basta modificar o tipo do PK para autoincremento
-        fetch_maior_id = """
-            SELECT MAX(id_reserva)
-            FROM reserva
-        """
-        cursor.execute(fetch_maior_id)
-        ultimo_id = cursor.fetchone()[0]
-
-        # último id
-        reserva_a_efetuar.append(ultimo_id + 1)
-
         # hora escolhida
         hora_escolhida = datetime.strptime(hora_escolhida, "%Hh%M")
         # colocar a data de teste -> 16/04
-        hora_escolhida = hora_escolhida.replace(year = 2024, month = 4, day = data_para_reservas.day)
+        hora_escolhida = hora_escolhida.replace(year = data_para_reservas.year, month = data_para_reservas.month, day = data_para_reservas.day)
         
         reserva_a_efetuar.append(hora_escolhida)
         
@@ -1695,14 +1696,16 @@ def efetuar_reserva(connection, utilizador):
             print(" *\n * Ficará em espera para o slot: ", hora_escolhida.strftime("%d/%m"), " | ", hora_escolhida.strftime("%Hh%M"), " | Campo -", campo_escolhido)
             print(" * * Será notificado caso o campo fique vago! *")
         else:
-            print(" *\n * A seguinte reserva será efetuada: ", hora_escolhida.strftime("%d/%m"), " | ", hora_escolhida.strftime("%Hh%M"), " | ", preco_reserva, "€ | Campo -", campo_escolhido)
+            print(" *\n * A seguinte reserva foi efetuada: ", hora_escolhida.strftime("%d/%m"), " | ", hora_escolhida.strftime("%Hh%M"), " | ", preco_reserva, "€ | Campo -", campo_escolhido)
 
-        efetua_reserva = "INSERT INTO reserva VALUES (%s, %s, %s, %s, %s, %s)"
+        efetua_reserva = """
+            INSERT INTO reserva (id_reserva, horario, estado, price_id_custo, campo_id_campo, cliente_utilizador_email)
+            VALUES (nextval('reserva_id_reserva_seq'), %s, %s, %s, %s, %s)
+        """
         cursor.execute(efetua_reserva, reserva_a_efetuar)
         connection.commit()
 
-        print(" * \n * Reserva efetuada com sucesso! * ")
-        input(" * \n * Regressar - Enter")
+        input(" *\n * \n * Regressar - Enter")
 
     cursor.close()
 
@@ -1712,8 +1715,6 @@ def apresentar_reservas(connection, utilizador, data_para_reservas):
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
     data_amanha = data_para_reservas + timedelta(days = 1)
-    # substituir no execute
-    # date = datetime.now(hour = 0, minute = 0, second = 0)
 
     # ir buscar reservas do dia escolhido
     fetch_reservas_hoje = """
@@ -1728,8 +1729,7 @@ def apresentar_reservas(connection, utilizador, data_para_reservas):
     
     os.system('cls')
     print(" ***** Reserva de campo no Padel Mondego *****\n *")
-    #print(" * Campos Disponíveis para hoje,", datetime.now().strftime("%d/%m"))
-    print(" * Campos para ", data_para_reservas.strftime("%d/%m"), " às", data_para_reservas.strftime("%Hh%M"))
+    print(" * Campos para", data_para_reservas.strftime("%d/%m"))
     
     fetch_precos = "SELECT * FROM price WHERE ativo = True"
     cursor.execute(fetch_precos)
@@ -1744,16 +1744,16 @@ def apresentar_reservas(connection, utilizador, data_para_reservas):
     horarios_semana = ["15h00", "16h30", "18h00", "19h30", "21h00", "22h30"]
     horarios_fds = ["10h00", "11h30", "13h00", "14h30", "16h00", "17h30", "19h00", "20h30"]
 
-    # agora sim, as horas que são neste momento 
-    hora_atual = datetime(year = 2024, month = 4, day = 16, hour = 12, minute = 00, second = 00)
-    # hora_atual = datetime.now()
-
     horario = []
     # verificar se é fim de semana
-    if hora_atual.isoweekday() >= 6:
+    if data_para_reservas.isoweekday() >= 6:
         horario = horarios_fds
     else:
         horario = horarios_semana
+
+    # agora sim, as horas que são neste momento 
+    #hora_atual = datetime(year = 2024, month = 4, day = 16, hour = 12, minute = 00, second = 00)
+    hora_atual = datetime.now()
 
     # mostrar slots a partir da hora atual
     horario = [horario[i] for i in range(len(horario)) if hora_atual.hour < int(horario[i][:2]) or (hora_atual.hour == int(horario[i][:2]) and hora_atual.minute <= int(horario[i][3:]))]
@@ -1859,7 +1859,8 @@ def reservas_atuais(connection, utilizador):
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
     # hora teste
-    horario_atual = datetime(year = 2024, month = 4, day = 16, hour = 12, minute = 00, second = 00)
+    #horario_atual = datetime(year = 2024, month = 4, day = 16, hour = 12, minute = 00, second = 00)
+    horario_atual = datetime.now()
 
     # mostra reservas futuras
     fetch_reservas_user = """
@@ -1928,9 +1929,12 @@ def reservas_atuais(connection, utilizador):
             table.add_row([" ", reserva_futura['campo_id_campo'], reserva_futura['horario'].strftime("%d/%m"),
                         reserva_futura['horario'].strftime("%Hh%M"), apresentar_preco, reserva_futura['estado'], apresentar_notificacao])
 
-    # imprime reservas 'Em Espera'
-    print(table)
-    
+
+    if table.rowcount != 0:
+        print(table)
+    else:
+        print(" * Não tem reservas futuras! * ")
+
     table_2 = PrettyTable()
     table_2.field_names = ["#", "Campo", "Data", "Horário", "Preço", "Estado", "Not"]
     for reserva in reservas_em_espera:
@@ -2053,8 +2057,9 @@ def historico_reservas(connection, utilizador):
     
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
-    # hora atual teste -> 18h00
-    horario_atual = datetime(year = 2024, month = 4, day = 16, hour = 23, minute = 00, second = 00)
+    # hora teste
+    #horario_atual = datetime(year = 2024, month = 4, day = 16, hour = 23, minute = 00, second = 00)
+    horario_atual = datetime.now()
 
     fetch_historico_reservas = """
         SELECT horario, estado, price_id_custo, campo_id_campo, cliente_utilizador_email
@@ -2085,7 +2090,11 @@ def historico_reservas(connection, utilizador):
         table.add_row([reserva_futura['campo_id_campo'], reserva_futura['horario'].strftime("%d/%m"),
                         reserva_futura['horario'].strftime("%Hh%M"), apresentar_preco, reserva_futura['estado']])
 
-    print(table)
+    if table.rowcount != 0:
+        print(table)
+    else:
+        print(" * Não tem reservas no histórico! * ")
+    
     input("\n * Regressar - Enter")
     cursor.close()
 
@@ -2406,7 +2415,7 @@ def atualiza_campos(connection):
         print("Fields updated successfully\n\n")
     else:
         print("\n")
-        
+
     cursor.close()
 
 # ------------------------------------
