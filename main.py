@@ -345,12 +345,12 @@ def remover_admin(connection):
     os.system('cls')
     print(" ***** Remover Administrador *****\n ")
     print(table)
-    print(" \n * ", len(admins) + 1, ". Regressar\n *")
+    print(f"\n * {len(admins) + 1}. Regressar\n *")
 
     opcao = 0
     regressar = False
     while opcao < 1 or opcao > len(admins) + 1:
-        opcao = int(input(" * Escolha um cliente -> "))
+        opcao = int(input(" * Escolha um administrador -> "))
 
         if opcao == len(admins) + 1:
             regressar = True
@@ -362,12 +362,39 @@ def remover_admin(connection):
     
     if not regressar:
 
+        remover_mensagens_clientes = """
+            DELETE FROM mensagem_cliente
+            WHERE mensagem_id_mensagem IN (SELECT id_mensagem FROM mensagem WHERE administrador_utilizador_email = %s);
+        """
+        cursor.execute(remover_mensagens_clientes, (admin['email'],))
+        connection.commit()
+
+        remover_mensagens = """
+            DELETE FROM mensagem
+            WHERE administrador_utilizador_email = %s;
+        """
+        cursor.execute(remover_mensagens, (admin['email'],))
+        connection.commit()
+
         remover_admin = """
             DELETE FROM administrador
             WHERE utilizador_email = %s;
         """
         cursor.execute(remover_admin, (admin['email'],))
         connection.commit()
+
+        print(admin)
+        tipo = tipo_utilizador(connection, admin)
+        print(tipo)
+        input(" ")
+
+        if tipo_utilizador(connection, admin) == 'Admin':
+            remover_utilizador = """
+                DELETE FROM utilizador
+                WHERE email = %s;
+            """
+            cursor.execute(remover_utilizador, (admin['email'],))
+            connection.commit()
 
         print(" *\n * Administrador removido com sucesso!")
         input(" * \n * Regressar - Enter")
@@ -467,9 +494,10 @@ def estatisticas(connection):
             input(" \n * Regressar - Enter")
         
         elif opcao == 3:
+            
             tipo_menu = " ***** Campos sem reservas *****\n *"
             data_inicial, data_final = menu_periodo(tipo_menu)
-
+            
             horarios_semana = ["15h00", "16h30", "18h00", "19h30", "21h00", "22h30"]
             horarios_fds = ["10h00", "11h30", "13h00", "14h30", "16h00", "17h30", "19h00", "20h30"]
             
@@ -478,58 +506,38 @@ def estatisticas(connection):
             while current_date <= data_final:
                 
                 if current_date.weekday() < 5:
-                    for horario in horarios_semana:
-                        todos_horarios.append((current_date, horario))
+                    for i in range(1, 4):
+                        for horario in horarios_semana:
+                            if not ja_reservado(connection, current_date, horario, i):
+                                todos_horarios.append((current_date, horario, i))
                 else:
-                    for horario in horarios_fds:
-                        todos_horarios.append((current_date, horario))
+                    for i in range(1, 4):
+                        for horario in horarios_fds:
+                            if not ja_reservado(connection, current_date, horario, i):
+                                todos_horarios.append((current_date, horario, i))
                 
                 current_date += timedelta(days = 1)
 
-            fetch_reservations = """
-                SELECT horario, campo_id_campo
-                FROM reserva
-                WHERE horario >= %s AND horario <= %s
-            """
-            cursor.execute(fetch_reservations, (data_inicial, data_final))
-            reservations = [(reserva['horario'].strftime("%d/%m"), reserva['horario'].strftime("%Hh%M"), reserva['campo_id_campo']) for reserva in cursor.fetchall()]
-
-            for r in reservations:
-                print(r)
-
-            for slot in todos_horarios:
-                print(slot)
-
-            input(" ")
-
-            # Find timetable slots without reservations
-            timetables_without_reservations = [timetable for timetable in todos_horarios if timetable not in reservations]
-
-            # Group timetable slots without reservations by day and field
-            timetables_by_day_field = {}
-            for timetable in timetables_without_reservations:
-                day = timetable[0].strftime("%d/%m")
-                field = timetable[1]
-                if day not in timetables_by_day_field:
-                    timetables_by_day_field[day] = {1: [], 2: [], 3: []}
-                timetables_by_day_field[day][field].append(timetable)
 
             # Print timetables without reservations grouped by day and field
             os.system('cls')
             print(" ***** Campos sem reservas *****\n *")
             print(" * Período: (", data_inicial.strftime("%d/%m/%Y"), " a ", data_final.strftime("%d/%m/%Y"), ")\n ")
 
-            if timetables_by_day_field:
-                for day, fields in timetables_by_day_field.items():
-                    print(f"{day}")
-                    for field, timetables in fields.items():
-                        print(f"\nField {field}")
-                        for timetable in timetables:
-                            print(timetable[1].strftime("%Hh%M"))
+            table = PrettyTable()
+            table.field_names = ["Data", "Horário", "Campo"]
+            if todos_horarios:
+                for horario in todos_horarios:
+                    if horario[1] == "22h30" or horario[1] == "20h30":
+                        table.add_row([horario[0].strftime("%d/%m"), horario[1], horario[2]], divider = True)
+                    else:
+                        table.add_row([horario[0].strftime("%d/%m"), horario[1], horario[2]])
+                print(table)
             else:
                 print(" * Todos os horários foram reservados neste período.\n *")
 
             input(" \n * Regressar - Enter")
+
 
 
         elif opcao == 4:
@@ -607,6 +615,25 @@ def estatisticas(connection):
             input(" \n * Regressar - Enter")
     
     cursor.close()
+
+# ------------------------------------
+def ja_reservado(connection, current_date, horario, campo_id):
+    
+    cursor = connection.cursor()
+    
+    slot = datetime.combine(current_date, datetime.strptime(horario, "%Hh%M").time())
+
+    fetch_reservas = """
+        SELECT COUNT(*)
+        FROM reserva
+        WHERE estado = 'Reservado' AND horario = %s AND campo_id_campo = %s;
+    """
+    
+    cursor.execute(fetch_reservas, (slot, campo_id))
+    count = cursor.fetchone()[0]
+    cursor.close()
+
+    return count > 0
 
 # ------------------------------------
 def mensagens_admin(connection, utilizador, tipo_user):
@@ -2428,7 +2455,7 @@ def database_connection():
             password = "pepas1206",
             host = "127.0.0.1",
             port = "5432",
-            database = "padel mondego"
+            database = 'padel mondego'
         )
 
         cursor = connection.cursor()
