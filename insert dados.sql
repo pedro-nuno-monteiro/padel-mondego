@@ -68,10 +68,3 @@ INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_ema
 (TRUE, 1, 'afonso@gmail.com'),
 (FALSE, 2, 'luis@gmail.com'),
 (FALSE, 3, 'afonso@gmail.com');
-
--- tabela admin_permissoes
-INSERT INTO administrador_permissoes (administrador_utilizador_email) VALUES
-('sadmin@gmail.com'),
-('admin@gmail.com'),
-('admin1@gmail.com'),
-('admin2@gmail.com');

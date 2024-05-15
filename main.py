@@ -295,28 +295,74 @@ def adicionar_admin(connection):
     print(table_admins)
     print(" \n* Clientes *\n")
     print(table)
-    print(" \n * ", i , ". Regressar\n *")
+    print(" \n *", i, ". Registar um novo admin")
+    print(" *", i + 1, ". Regressar\n *")
 
     opcao = 0
+    novo = False
     regressar = False
-    while opcao < 1 or opcao > i:
-        opcao = int(input(" * Escolha um cliente -> "))
+    while opcao < 1 or opcao > i + 1:
+        opcao = int(input(" * Escolha uma opção -> "))
 
-        if opcao == i:
+        if opcao == i + 1:
             regressar = True
             break
         
+        elif opcao == i:
+            novo = True
+            break
+
         elif opcao < i:
             cliente = cliente_valido[opcao - 1]
+            email = cliente['email']
             break
     
     if not regressar:
+
+        if novo:
+
+            nome = input(" * Nome: ")
+            padrao_email = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            
+            while True:    
+                email = input(" * Email: ")
+
+                if not re.match(padrao_email, email):
+                    print(" * \n *** ATENÇÃO -> Email inválido! ***")
+                
+                else:
+                    try:
+                        cursor.execute("SELECT email FROM utilizador WHERE email = %s", (email,))
+                        if cursor.fetchone():
+                            print(" * \n *** ATENÇÃO -> Email já registado! ***")
+                        else:
+                            break
+                    except psycopg2.Error as e:
+                        print(" * \n *** ERRO -> Falha ao verificar o email! ***")
+                        print(e)
+
+            passe = 'padel'
+
+            # tem de ser por esta ordem!
+            user = []
+            user.append(email)
+            user.append(passe)
+            user.append(nome)
+
+            try:
+                cursor.execute("INSERT INTO utilizador (email, passe, nome) VALUES (%s, crypt(%s, gen_salt('bf', 8)), %s)", (user))
+                connection.commit()
+
+            except psycopg2.Error as e:
+                connection.rollback()
+                print(" * \n *** ERRO -> Falha ao inserir utilizador! ***")
+                print(e)
 
         adicionar_admin = """
             INSERT INTO administrador (super_admin, utilizador_email)
             VALUES (%s, %s)
         """
-        cursor.execute(adicionar_admin, (False, cliente['email'],))
+        cursor.execute(adicionar_admin, (False, email,))
         connection.commit()
 
         print(" * Administrador adicionado com sucesso!")
@@ -361,45 +407,54 @@ def remover_admin(connection):
             break
     
     if not regressar:
-
-        remover_mensagens_clientes = """
-            DELETE FROM mensagem_cliente
-            WHERE mensagem_id_mensagem IN (SELECT id_mensagem FROM mensagem WHERE administrador_utilizador_email = %s);
-        """
-        cursor.execute(remover_mensagens_clientes, (admin['email'],))
-        connection.commit()
-
-        remover_mensagens = """
-            DELETE FROM mensagem
-            WHERE administrador_utilizador_email = %s;
-        """
-        cursor.execute(remover_mensagens, (admin['email'],))
-        connection.commit()
-
-        remover_admin = """
-            DELETE FROM administrador
-            WHERE utilizador_email = %s;
-        """
-        cursor.execute(remover_admin, (admin['email'],))
-        connection.commit()
-
-        print(admin)
-        tipo = tipo_utilizador(connection, admin)
-        print(tipo)
-        input(" ")
-
-        if tipo_utilizador(connection, admin) == 'Admin':
-            remover_utilizador = """
-                DELETE FROM utilizador
-                WHERE email = %s;
-            """
-            cursor.execute(remover_utilizador, (admin['email'],))
-            connection.commit()
-
-        print(" *\n * Administrador removido com sucesso!")
-        input(" * \n * Regressar - Enter")
         
-    cursor.close()
+        try:
+            remover_mensagens_clientes = """
+                DELETE FROM mensagem_cliente
+                WHERE mensagem_id_mensagem IN (SELECT id_mensagem FROM mensagem WHERE administrador_utilizador_email = %s);
+            """
+            cursor.execute(remover_mensagens_clientes, (admin['email'],))
+
+            remover_mensagens = """
+                DELETE FROM mensagem
+                WHERE administrador_utilizador_email = %s;
+            """
+            cursor.execute(remover_mensagens, (admin['email'],))
+
+            remover_admin = """
+                DELETE FROM administrador
+                WHERE utilizador_email = %s;
+            """
+            cursor.execute(remover_admin, (admin['email'],))
+
+            perceber_cliente = """
+                SELECT COUNT(*)
+                FROM cliente
+                WHERE utilizador_email = %s;
+            """
+            cursor.execute(perceber_cliente, (admin['email'],))
+            cliente = cursor.fetchone()
+
+            if cliente[0] == 0:
+                remover_utilizador = """
+                    DELETE FROM utilizador
+                    WHERE email = %s;
+                """
+                cursor.execute(remover_utilizador, (admin['email'],))
+                
+            connection.commit()
+            input("")
+
+            print(" *\n * Administrador removido com sucesso!")
+            input(" * \n * Regressar - Enter")
+
+        except (Exception, psycopg2.Error) as error:
+            connection.rollback()
+            print("Error:", error)
+
+        finally:
+            cursor.close()
+
     return regressar
 
 # ------------------------------------
@@ -968,54 +1023,62 @@ def alterar_precos(connection):
 
             print(table_2)
             regressar = True
-            input("\n Regressar - Enter")
+            input("\n * Regressar - Enter")
             
         elif opcao == 5:
             regressar = True
             break
 
     if not regressar:
-        os.system('cls')
-        print(" ***** Alterar Preço *****\n *")
-        print(" * Preço a alterar:\n *")
 
-        table_3 = PrettyTable()
-        table_3.field_names = ["Tipo Dia", "Horário", "Data Alteração", "Preço Antigo", "Preço Atual"]
-        apresentar_preco = f"{preco_a_alterar['preco_atual']} €"
-        apresentar_preco_antigo = f"{preco_a_alterar['valor_antigo']} €"
-        table_3.add_row([preco_a_alterar['tipo_dia'], preco_a_alterar['horario'],
-                        preco_a_alterar['data_alteracao'].strftime("%d/%m"), apresentar_preco_antigo, apresentar_preco])
+        try:
+            os.system('cls')
+            print(" ***** Alterar Preço *****\n *")
+            print(" * Preço a alterar:\n *")
 
-        print(table_3)
+            table_3 = PrettyTable()
+            table_3.field_names = ["Tipo Dia", "Horário", "Data Alteração", "Preço Antigo", "Preço Atual"]
+            apresentar_preco = f"{preco_a_alterar['preco_atual']} €"
+            apresentar_preco_antigo = f"{preco_a_alterar['valor_antigo']} €"
+            table_3.add_row([preco_a_alterar['tipo_dia'], preco_a_alterar['horario'],
+                            preco_a_alterar['data_alteracao'].strftime("%d/%m"), apresentar_preco_antigo, apresentar_preco])
 
-        novo_preco = preco_a_alterar['preco_atual']
-        while novo_preco < 0 or novo_preco == preco_a_alterar['preco_atual']:
-            novo_preco = int(input("\n * Indique o novo preço -> "))
+            print(table_3)
 
-            if novo_preco == preco_a_alterar['preco_atual']:
-                print(" * \n * ATENÇÃO -> Preço igual ao anterior! * ")
+            novo_preco = preco_a_alterar['preco_atual']
+            while novo_preco < 0 or novo_preco == preco_a_alterar['preco_atual']:
+                novo_preco = int(input("\n * Indique o novo preço -> "))
 
-        # acrescenta novo preco
-        data_alteracao = datetime.now().date()
-        atualizar_preco = """
-            INSERT INTO price (id_custo, tipo_dia, horario, data_alteracao, ativo, valor_antigo, preco_atual)
-            VALUES (nextval('price_id_custo_seq'), %s, %s, %s, %s, %s, %s)
-        """
-        cursor.execute(atualizar_preco, (preco_a_alterar['tipo_dia'], preco_a_alterar['horario'],
-                                        data_alteracao, True, preco_a_alterar['preco_atual'], novo_preco))
-        connection.commit()
+                if novo_preco == preco_a_alterar['preco_atual']:
+                    print(" * \n * ATENÇÃO -> Preço igual ao anterior! * ")
 
-        # altera o anterior
-        alterar_preco = """
-            UPDATE price
-            SET ativo = False
-            WHERE id_custo = %s
-        """
-        cursor.execute(alterar_preco, (preco_a_alterar['id_custo'],))
-        connection.commit()
+            # acrescenta novo preco
+            data_alteracao = datetime.now().date()
+            atualizar_preco = """
+                INSERT INTO price (id_custo, tipo_dia, horario, data_alteracao, ativo, valor_antigo, preco_atual)
+                VALUES (nextval('price_id_custo_seq'), %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(atualizar_preco, (preco_a_alterar['tipo_dia'], preco_a_alterar['horario'],
+                                            data_alteracao, True, preco_a_alterar['preco_atual'], novo_preco))
+
+            # altera o anterior
+            alterar_preco = """
+                UPDATE price
+                SET ativo = False
+                WHERE id_custo = %s
+            """
+            cursor.execute(alterar_preco, (preco_a_alterar['id_custo'],))
+
+            connection.commit()
+
+        except (Exception, psycopg2.Error) as error:
+            connection.rollback()
+            print("Error:", error)
+
+        finally:
+            cursor.close()
 
         print(" * Preço atualizado com sucesso!")
-        cursor.close()
         input(" * \n * Regressar - Enter")
 
 # ------------------------------------
@@ -1049,6 +1112,12 @@ def alterar_reservas_menu(connection):
     table.field_names = ["#", "Cliente", "Email", "Horário", "Campo", "Estado"]
 
     i = 1
+
+    if not reservas_futuras:
+        print(" * Não existem reservas futuras para alterar!")
+        input(" * \n * Regressar - Enter")
+        return
+
     current_user = reservas_futuras[0]['email']
     numero_reservas_futuras = len(reservas_futuras)
     
@@ -1370,7 +1439,7 @@ def menu_cliente(connection, utilizador):
 
     opcao = 1
     while opcao > 0 or opcao < 6:
-        opcao = apresentar_menu_cliente(utilizador)
+        opcao = apresentar_menu_cliente(connection, utilizador)
 
         if opcao == 1:
             voltar = informacoes_e_perfil(connection, utilizador)
@@ -1630,6 +1699,9 @@ def efetuar_reserva(connection, utilizador):
 
     cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
 
+    # Lock à tabela reserva
+    cursor.execute("SELECT * FROM reserva FOR UPDATE")
+
     data_para_reservas = datetime.now().replace(hour = 0, minute = 0, second = 0)
     
     opcao = 0
@@ -1779,7 +1851,6 @@ def apresentar_reservas(connection, utilizador, data_para_reservas):
         horario = horarios_semana
 
     # agora sim, as horas que são neste momento 
-    #hora_atual = datetime(year = 2024, month = 4, day = 16, hour = 12, minute = 00, second = 00)
     hora_atual = datetime.now()
 
     # mostrar slots a partir da hora atual
@@ -1856,8 +1927,19 @@ def apresentar_reservas(connection, utilizador, data_para_reservas):
         elif opcao < 1 or opcao > i + 1:
             print(" * \n * ATENÇÃO -> Opção inválida! *")
         
+        # VOLTA A VERIFICAR SE PODE FAZER RESERVA
         # verificação que não reserva um campo já reservado
         # verificação que não fica em espera para um campo já em espera
+        fetch_reservas_hoje = """
+            SELECT *
+            FROM reserva
+            WHERE horario >= %s AND horario < %s AND (estado = 'Reservado' OR estado = 'Em Espera' OR estado = 'Alterado Reservado')
+            ORDER BY campo_id_campo, horario, estado DESC
+        """
+
+        cursor.execute(fetch_reservas_hoje, (data_para_reservas, data_amanha))
+        reservas_hoje = cursor.fetchall()
+
         for reserva_hoje in reservas_hoje:
             nao_pode_fazer_reserva = False
             if reserva_hoje['campo_id_campo'] == campo_escolhido and reserva_hoje['horario'].strftime("%Hh%M") == hora_escolhida:
@@ -2006,9 +2088,9 @@ def reservas_atuais(connection, utilizador):
                 reservas_totais = """
                     SELECT *
                     FROM reserva
-                    WHERE estado = 'Em Espera' AND horario >= %s
+                    WHERE estado = 'Em Espera' AND campo_id_campo = %s AND horario = %s
                 """
-                cursor.execute(reservas_totais, (horario_atual,))
+                cursor.execute(reservas_totais, (reserva_cancelar['campo_id_campo'], reserva_cancelar['horario']))
                 reservas = cursor.fetchall()
 
                 fetch_mensagens = """
@@ -2025,20 +2107,29 @@ def reservas_atuais(connection, utilizador):
                         cliente_em_espera.append(reserva['cliente_utilizador_email'])
 
                 if len(cliente_em_espera) > 0:
-                    envia_notificacao = """
-                        INSERT INTO mensagem (id_mensagem, assunto, conteudo, data_envio, geral, administrador_utilizador_email)
-                        VALUES (%s, 'Campo Disponível!', %s, %s, FALSE, 'sadmin')
-                    """
-                    cursor.execute(envia_notificacao, (id_correto, conteudo_mensagem, horario_atual.strftime('%Y-%m-%d'),))
-                    connection.commit()
 
-                    for cliente in cliente_em_espera:
-                        envia_notificacao_cliente = """
-                            INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_email)
-                            VALUES (FALSE, %s, %s)
+                    try:
+                        envia_notificacao = """
+                            INSERT INTO mensagem (id_mensagem, assunto, conteudo, data_envio, geral, administrador_utilizador_email)
+                            VALUES (%s, 'Campo Disponível!', %s, %s, FALSE, 'sadmin@gmail.com')
                         """
-                        cursor.execute(envia_notificacao_cliente, (id_correto, cliente))
+                        cursor.execute(envia_notificacao, (id_correto, conteudo_mensagem, horario_atual.strftime('%Y-%m-%d'),))
+
+                        for cliente in cliente_em_espera:
+                            envia_notificacao_cliente = """
+                                INSERT INTO mensagem_cliente (lida, mensagem_id_mensagem, cliente_utilizador_email)
+                                VALUES (FALSE, %s, %s)
+                            """
+                            cursor.execute(envia_notificacao_cliente, (id_correto, cliente))
+
                         connection.commit()
+                        
+                    except (Exception, psycopg2.Error) as error:
+                        connection.rollback()
+                        print("Error", error)
+
+                    finally:
+                        cursor.close()
 
                 print(" * Reserva cancelada com sucesso!")
 
@@ -2141,7 +2232,7 @@ def tipo_utilizador(connection, utilizador):
     cursor.execute(fetch_ambos, (utilizador['email'], utilizador['email']))
     linha1 = cursor.fetchone()
 
-    if linha1 is not None:
+    if linha1:
         return "Ambos"
 
     fetch_admins = """
@@ -2261,7 +2352,6 @@ def register(connection):
             except psycopg2.Error as e:
                 print(" * \n *** ERRO -> Falha ao verificar o email! ***")
                 print(e)
-                input("ora colas")
 
     password = input(" * Password: ")
     cursor.execute("SELECT crypt(%s, gen_salt('bf'))", (password,))
@@ -2281,7 +2371,6 @@ def register(connection):
         connection.rollback()
         print(" * \n *** ERRO -> Falha ao inserir utilizador! ***")
         print(e)
-        input("ora golas")
         return None
 
     user_cliente = []
@@ -2373,7 +2462,7 @@ def apresentar_menu_admin(tipo_user, utilizador):
         print(" * \n *** ATENÇÃO -> Opção inválida! ***")
 
 # ------------------------------------
-def apresentar_menu_cliente(utilizador):
+def apresentar_menu_cliente(connection, utilizador):
     os.system('cls')
     print(" ***** Menu Cliente", utilizador['nome'], " *****\n *")
     print(" * 1 - Informações e Perfil")
@@ -2382,6 +2471,23 @@ def apresentar_menu_cliente(utilizador):
     print(" * 4 - Histórico de Reservas")
     print(" * 5 - Mensagens")
     print(" * 6 - Logout | Sair\n *")
+
+    cursor = connection.cursor(cursor_factory = psycopg2.extras.DictCursor)
+
+    fetch_mensagens = """
+        SELECT *
+        FROM mensagem, mensagem_cliente
+        WHERE id_mensagem = mensagem_id_mensagem 
+                AND cliente_utilizador_email = %s 
+                AND assunto = 'Campo Disponível!'
+                AND lida = FALSE 
+        ORDER BY lida, mensagem_id_mensagem
+    """
+    cursor.execute(fetch_mensagens, (utilizador['email'],))
+    mensagens = cursor.fetchall()
+
+    if len(mensagens) > 0:
+        print(" *\n * Tem uma nova notificação de campo!\n *")
 
     while True:
         opcao = input(" * Escolha uma opção -> ").strip()

@@ -1,5 +1,6 @@
 CREATE EXTENSION pgcrypto;
 
+-- sequência
 CREATE SEQUENCE reserva_id_reserva_seq START WITH 9;
 CREATE SEQUENCE price_id_custo_seq START WITH 5;
 CREATE SEQUENCE mensagem_id_mensagem_seq START WITH 4;
@@ -71,10 +72,6 @@ CREATE TABLE mensagem_cliente (
 	PRIMARY KEY(mensagem_id_mensagem,cliente_utilizador_email)
 );
 
-CREATE TABLE administrador_permissoes (
-	administrador_utilizador_email VARCHAR(512),
-	PRIMARY KEY(administrador_utilizador_email)
-);
 
 ALTER TABLE cliente ADD UNIQUE (nif, numero_telefone);
 ALTER TABLE cliente ADD CONSTRAINT cliente_fk1 FOREIGN KEY (utilizador_email) REFERENCES utilizador(email);
@@ -85,8 +82,6 @@ ALTER TABLE mensagem ADD CONSTRAINT mensagem_fk1 FOREIGN KEY (administrador_util
 ALTER TABLE administrador ADD CONSTRAINT administrador_fk1 FOREIGN KEY (utilizador_email) REFERENCES utilizador(email);
 ALTER TABLE mensagem_cliente ADD CONSTRAINT mensagem_cliente_fk1 FOREIGN KEY (mensagem_id_mensagem) REFERENCES mensagem(id_mensagem);
 ALTER TABLE mensagem_cliente ADD CONSTRAINT mensagem_cliente_fk2 FOREIGN KEY (cliente_utilizador_email) REFERENCES cliente(utilizador_email);
-
--- sequência
 
 -- trigger
 CREATE OR REPLACE FUNCTION jogo_reservado_termina()
