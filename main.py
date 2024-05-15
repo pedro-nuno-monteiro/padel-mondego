@@ -1863,10 +1863,15 @@ def apresentar_reservas(connection, utilizador, data_para_reservas):
         reservado = False
         for reserva_hoje in reservas_hoje:
             if reserva_hoje['campo_id_campo'] == 1 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
-                if reserva_hoje['estado'] == 'Reservado' or reserva_hoje['estado'] == 'Alterado Reservado':
-                    print(" * ", i, " - ", horario_semana, " | ", reserva_hoje['estado'], " | ", reserva_hoje['cliente_utilizador_email'])
-                    reservado = True
-                    break
+                if (reserva_hoje['estado'] == 'Reservado' or reserva_hoje['estado'] == 'Alterado Reservado'):
+                    if reserva_hoje['cliente_utilizador_email'] == utilizador['email']:
+                        print(" * ", i, " - ", horario_semana, " |", reserva_hoje['estado'], " | *")
+                        reservado = True
+                        break
+                    else:
+                        print(" * ", i, " - ", horario_semana, " |", reserva_hoje['estado'])
+                        reservado = True
+                        break
         if not reservado:
             print(" * ", i, " - ", horario_semana, " | Livre")
         i += 1
@@ -1876,11 +1881,16 @@ def apresentar_reservas(connection, utilizador, data_para_reservas):
     for horario_semana in horario:
         reservado = False
         for reserva_hoje in reservas_hoje:
-            if reserva_hoje['campo_id_campo'] == 2 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
-                if reserva_hoje['estado'] == 'Reservado' or reserva_hoje['estado'] == 'Alterado Reservado':
-                    print(" * ", i, " - ", horario_semana, " | ", reserva_hoje['estado'], " | ", reserva_hoje['cliente_utilizador_email'])
-                    reservado = True
-                    break
+            if reserva_hoje['campo_id_campo'] == 1 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
+                if (reserva_hoje['estado'] == 'Reservado' or reserva_hoje['estado'] == 'Alterado Reservado'):
+                    if reserva_hoje['cliente_utilizador_email'] == utilizador['email']:
+                        print(" * ", i, " - ", horario_semana, " |", reserva_hoje['estado'], " | *")
+                        reservado = True
+                        break
+                    else:
+                        print(" * ", i, " - ", horario_semana, " |", reserva_hoje['estado'])
+                        reservado = True
+                        break
         if not reservado:
             print(" * ", i, " - ", horario_semana, " | Livre")
         i += 1
@@ -1889,11 +1899,16 @@ def apresentar_reservas(connection, utilizador, data_para_reservas):
     for horario_semana in horario:
         reservado = False
         for reserva_hoje in reservas_hoje:
-            if reserva_hoje['campo_id_campo'] == 3 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
-                if reserva_hoje['estado'] == 'Reservado' or reserva_hoje['estado'] == 'Alterado Reservado':
-                    print(" * ", i, " - ", horario_semana, " | ", reserva_hoje['estado'], " | ", reserva_hoje['cliente_utilizador_email'])
-                    reservado = True
-                    break
+            if reserva_hoje['campo_id_campo'] == 1 and reserva_hoje['horario'].strftime("%Hh%M") == horario_semana:
+                if (reserva_hoje['estado'] == 'Reservado' or reserva_hoje['estado'] == 'Alterado Reservado'):
+                    if reserva_hoje['cliente_utilizador_email'] == utilizador['email']:
+                        print(" * ", i, " - ", horario_semana, " |", reserva_hoje['estado'], " | *")
+                        reservado = True
+                        break
+                    else:
+                        print(" * ", i, " - ", horario_semana, " |", reserva_hoje['estado'])
+                        reservado = True
+                        break
         if not reservado:
             print(" * ", i, " - ", horario_semana, " | Livre")
         i += 1
