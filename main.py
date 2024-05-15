@@ -2,7 +2,6 @@ import psycopg2
 import psycopg2.extras
 import os
 import re
-import time
 from datetime import datetime, timedelta, date
 from prettytable import PrettyTable
 
@@ -2458,7 +2457,7 @@ def apresentar_menu_admin(tipo_user, utilizador):
     print(" * 1 - Alterar Reservas")
     print(" * 2 - Alterar Preços")
     print(" * 3 - Estatísticas")
-    print(" * 4 - Mensagem")
+    print(" * 4 - Mensagens ")
     print(" * 5 - Descrição Campos")
     print(" * 6 - Editar Perfil")
     
